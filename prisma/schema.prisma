@@ -1,0 +1,32 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+//model
+
+model customer {
+  id         Int   @id @default(autoincrement())
+  name       String
+  email      String   @unique // Email must be unique to link reliably
+  role       String
+  // This is your flexible column for custom CRM fields
+  metadata   Json     @default("{}") 
+  // Relation field (doesn't exist in DB, just for Prisma)
+  customer_info customer_info?
+}
+
+model customer_info{
+  id         Int   @id // Remove autoincrement here
+  email      String
+  // This links the id of this model to the id of the customer model
+  customer   customer @relation(fields: [id], references: [id])
+}
