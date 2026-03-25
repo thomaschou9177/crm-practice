@@ -9,7 +9,7 @@ const translations = {
     username: "Username",
     password: "Password",
     signIn: "Sign In",
-    demoAccounts: "Valid Demo Accounts",
+    // demoAccounts: "Valid Demo Accounts",
     error: "Invalid username or password. Please try again.",
     success: "Login Successful! Welcome, "
   },
@@ -19,7 +19,7 @@ const translations = {
     username: "使用者名稱",
     password: "密碼",
     signIn: "登入",
-    demoAccounts: "有效測試帳號",
+    // demoAccounts: "有效測試帳號",
     error: "使用者名稱或密碼錯誤，請再試一次。",
     success: "登入成功！歡迎，"
   },
@@ -29,7 +29,7 @@ const translations = {
     username: "ユーザー名",
     password: "パスワード",
     signIn: "サインイン",
-    demoAccounts: "有効なデモアカウント",
+    // demoAccounts: "有効なデモアカウント",
     error: "ユーザー名またはパスワードが無効です。もう一度お試しください。",
     success: "ログインに成功しました！ようこそ、"
   }
@@ -130,7 +130,7 @@ export default function Home() {
           </button>
         </form>
 
-        <div className="mt-8 border-t border-gray-100 pt-6 text-center">
+        {/* <div className="mt-8 border-t border-gray-100 pt-6 text-center">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{t.demoAccounts}</p>
           <div className="mt-2 flex justify-center gap-3 text-xs text-gray-500">
             <span>admin</span>
@@ -139,7 +139,7 @@ export default function Home() {
             <span className="text-gray-300">|</span>
             <span>test</span>
           </div>
-        </div>
+        </div> */}
       </div>
     </main>
   );
