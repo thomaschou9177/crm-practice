@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation'; // Import the router
 import React, { useState } from 'react';
 
 const translations = {
@@ -42,6 +43,7 @@ const VALID_USERS = [
 ];
 
 export default function Home() {
+  const router = useRouter(); // Initialize router
   const [lang, setLang] = useState<'en' | 'zh' | 'jp'>('en');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -59,6 +61,7 @@ export default function Home() {
 
     if (user) {
       alert(`${t.success}${user.username}`);
+      router.push('/dashboard')
       // In a real app, you would use 'next/navigation' to redirect here
       // router.push('/dashboard'); 
     } else {
