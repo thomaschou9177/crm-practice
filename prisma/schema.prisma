@@ -29,5 +29,5 @@ model customer_info{
   id         Int   @id // Remove autoincrement here
   email      String
   // This links the id of this model to the id of the customer model
-  customer   customer @relation(fields: [id], references: [id])
+  customer   customer @relation(fields: [id], references: [id], onDelete: Cascade)
 }
