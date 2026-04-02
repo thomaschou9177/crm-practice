@@ -15,7 +15,7 @@ datasource db {
 //model
 
 model customer {
-  id         Int   @id @default(autoincrement())
+  id         Int   @id 
   name       String
   email      String   @unique // Email must be unique to link reliably
   role       String

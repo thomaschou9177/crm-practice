@@ -3,11 +3,10 @@ export const revalidate = 0;
 
 import { DeleteColumnButton } from '@/components/DeleteColumnButton';
 import { DeleteRowButton } from '@/components/DeleteRowButton';
+import EditableInput from '@/components/EditableInput';
+import JumpToPage from '@/components/JumpToPage';
 import { prisma } from '@/lib/db';
-import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
-
-// FIXED: Removed the extra '{' that caused the "Expression expected" error
+import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -16,18 +15,38 @@ export default async function DashboardPage({
  {
  // ✅ await 解開 Promise
   const params = await searchParams;
-
-  // 固定欄位
+  // --- 新增：分頁參數計算 ---
+  const pageSize = 50; // 每頁顯示 50 筆
+  const currentPage = Number(params.page) || 1;
+  const skip = (currentPage - 1) * pageSize;
+  // --- 新增：針對 customer_info 的分頁 ---
+  const syncPageSize = 50;
+  const currentSyncPage = Number(params.syncPage) || 1;
+  const syncSkip = (currentSyncPage - 1) * syncPageSize;
+  
+ // 固定欄位過濾參數
   const { id, name, email, role, syncId, syncEmail } = params;
 
   // --- FETCH ALL DATA ---
+  // --- 修改：增加 skip 與 take ---
+  // 僅抓取當前頁面的資料以確保效能
   const allCustomers = await prisma.customer.findMany({
     include: { customer_info: true },
     orderBy: { id: 'asc' },
+    skip: skip,   // 跳過前面的資料
+    take: pageSize // 只取出 50 筆
   });
-
+  // 取得總筆數以計算總頁數
+  const totalCount = await prisma.customer.count();
+  const totalPages = Math.ceil(totalCount / pageSize);
+  // 取得 customer_info 總筆數
+  const totalSyncCount = await prisma.customer_info.count();
+  const totalSyncPages = Math.ceil(totalSyncCount / syncPageSize);
+  
   const allSyncRecords = await prisma.customer_info.findMany({
     orderBy: { id: 'asc' },
+    skip: syncSkip,
+    take: syncPageSize,
   });
 
   // 動態 metadata keys
@@ -95,115 +114,12 @@ export default async function DashboardPage({
     count: filteredCustomers.length,
     whereClause: JSON.stringify(customerWhere),
   });
-  // --- SERVER ACTIONS ---
-
-  async function handleLogout() { 'use server'; redirect('/'); }
-
-  async function addCustomer(formData: FormData) {
-    'use server';
-    const email = formData.get('email') as string;
-    await prisma.customer.create({
-      data: {
-        name: formData.get('name') as string,
-        email, 
-        role: formData.get('role') as string,
-        customer_info: { create: { email } }
-      }
-    });
-    revalidatePath('/dashboard');
-  }
-
-  async function updateCoreData(formData: FormData) {
-    'use server';
-    const id = Number(formData.get('id'));
-    const field = formData.get('field') as string;
-    const value = formData.get('value') as string;
-    await prisma.customer.update({ where: { id }, data: { [field]: value } });
-    revalidatePath('/dashboard');
-  }
-
-  async function updateMetadataCell(formData: FormData) {
-    'use server';
-    const id = Number(formData.get('id'));
-    const key = formData.get('key') as string;
-    const newValue = formData.get('newValue') as string;
-    const record = await prisma.customer.findUnique({ where: { id } });
-    const meta = (record?.metadata as Record<string, any>) || {};
-    await prisma.customer.update({ where: { id }, data: { metadata: { ...meta, [key]: newValue } } });
-    revalidatePath('/dashboard');
-  }
-
-  async function addOrUpdateColumn(formData: FormData) {
-    'use server';
-    const id = Number(formData.get('id'));
-    const colTitle = formData.get('colTitle') as string;
-    const value = formData.get('value') as string;
-    if (!colTitle) return;
-    const record = await prisma.customer.findUnique({ where: { id } });
-    const meta = (record?.metadata as Record<string, any>) || {};
-    await prisma.customer.update({ where: { id }, data: { metadata: { ...meta, [colTitle]: value } } });
-    revalidatePath('/dashboard');
-  }
-
-  async function deleteWholeColumn(formData: FormData) {
-    'use server';
-    const keyToDelete = formData.get('keyToDelete') as string;
-    const allRecords = await prisma.customer.findMany();
-    for (const r of allRecords) {
-      const meta = (r.metadata as Record<string, any>) || {};
-      delete meta[keyToDelete];
-      await prisma.customer.update({ where: { id: r.id }, data: { metadata: meta } });
-    }
-    revalidatePath('/dashboard');
-  }
-
-  async function updateSyncEmail(formData: FormData) {
-    'use server';
-    const infoId = Number(formData.get('infoId'));
-    const newEmail = formData.get('newEmail') as string;
-    if (!infoId) return;
-    await prisma.customer_info.update({ where: { id: infoId }, data: { email: newEmail } });
-    revalidatePath('/dashboard');
-  }
-
-  async function deleteRow(formData: FormData) {
-    'use server';
-    await prisma.customer.delete({ where: { id: Number(formData.get('id')) } });
-    revalidatePath('/dashboard');
-  }
-
-  async function handleTableSearch(formData: FormData) {
-    'use server';
-    // Create a fresh params object to ensure a clean URL
-    const params = new URLSearchParams();
-    
-    // Only add fields that have an actual value
-    formData.forEach((value, key) => {
-      if (value && value.toString().trim() !== "") {
-        params.set(key, value.toString());
-      }
-    });
-    redirect(`/dashboard?${params.toString()}`);
-  }
-
-  async function handleSyncSearch(formData: FormData) {
-    'use server';
-    const params = new URLSearchParams();
-    // Remove table filters when updating sync filters
-    // ['id','name','email','role','age','birthday','education'].forEach(k => params.delete(k));
-    // Only add fields that have an actual value
-    formData.forEach((value, key) => {
-      if (value && value.toString().trim() !== "") {
-        params.set(key, value.toString());
-      }
-    });
-    redirect(`/dashboard?${params.toString()}`);
-  }
-
-  async function clearFilters() {
-    'use server';
-    redirect('/dashboard');
-  }
+ // 輔助函式：產生保留現有參數的 URL
+  const createURL = (name: string, value: string | number) => {
+    const newParams = new URLSearchParams(params as any);
+    newParams.set(name, value.toString());
+    return `/dashboard?${newParams.toString()}`;
+  };
 
   return (
     <div className="p-8 bg-gray-50 min-h-screen text-black text-[10px]">
@@ -215,14 +131,33 @@ export default async function DashboardPage({
           <form action={handleLogout}><button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">Logout</button></form>
         </div>
 
-        {/* IMPORT BAR */}
-        <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-4 flex items-center justify-between">
-          <h2 className="font-bold text-green-700 uppercase">Import Spreadsheet</h2>
-          <div className="flex gap-2">
-            <input type="file" className="bg-white border p-1 rounded" />
-            <button className="bg-green-600 text-white px-4 py-2 rounded font-bold">Upload & Sync</button>
-          </div>
-        </div>
+{/* IMPORT BAR */}
+<div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-4 flex items-center justify-between">
+  <h2 className="font-bold text-green-700 uppercase">Import Excel File</h2>
+  <form
+    action="/api/upload"
+    method="post"
+    encType="multipart/form-data"
+    className="flex gap-2"
+  >
+    <input
+      type="file"
+      name="file"
+      accept=".xlsx,.xls"
+      className="bg-white border p-1 rounded"
+      required
+    />
+    <button
+      type="submit"
+      className="bg-green-600 text-white px-4 py-2 rounded font-bold"
+    >
+      Upload & Sync
+    </button>
+  </form>
+</div>
+
+
+
 
         {/* 1. FILTER FOR CUSTOMER TABLE */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
@@ -251,20 +186,22 @@ export default async function DashboardPage({
 
         {/* ADD ROW BAR */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
-          <h2 className="font-bold mb-3 text-blue-600 uppercase text-[9px]">Add New Customer Row</h2>
+          <h2 className="font-bold mb-3 text-blue-600 uppercase text-[9px]">Add New Customer</h2>
           <form action={addCustomer} className="flex gap-2">
+            <input name="id" placeholder="id" className="border p-2 rounded flex-1 outline-none" required />
             <input name="name" placeholder="Name" className="border p-2 rounded flex-1 outline-none" required />
             <input name="email" placeholder="Email" className="border p-2 rounded flex-1 outline-none" required />
             <input name="role" placeholder="Role" className="border p-2 rounded flex-1 outline-none" required />
-            <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded font-bold">+ Create Row</button>
+            <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded font-bold">+ Create</button>
           </form>
         </div>
-        {/* DEBUG OVERRIDE */}
-<div className="bg-yellow-100 p-2 mb-4 border border-yellow-400 text-black">
+        {/* DEBUG OVERRIDE */}    
+        
+{/* <div className="bg-yellow-100 p-2 mb-4 border border-yellow-400 text-black">
   <p>Filter Active: {isCustomerFiltering ? "YES" : "NO"}</p>
   <p>URL ID: {id}</p>
   <p>Matches Found: {filteredCustomers.length}</p>
-</div>
+</div> */}
 
 {isCustomerFiltering && (
   <div className="mb-10 animate-in fade-in duration-500">
@@ -275,7 +212,22 @@ export default async function DashboardPage({
       </div>
     )}
   </div>
-)}
+)}     
+
+<div className="flex justify-between items-end mb-2">
+  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-tight">
+    Customer Table 
+    <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+      Total: {totalCount} records
+    </span>
+  </h2>
+
+  {/* 簡易換頁顯示 */}
+  <div className="flex items-center gap-2 text-[11px] font-bold text-gray-500">
+    <span>PAGE {currentPage} / {totalPages}</span>
+  </div>
+</div>
+
         {/* MAIN TABLE */}
         <div className="bg-white shadow-xl rounded-lg overflow-x-auto border border-gray-200 mb-10">
           <table className="min-w-full border-collapse">
@@ -302,25 +254,29 @@ export default async function DashboardPage({
             </thead>
             <tbody className="divide-y divide-gray-200">
               {allCustomers.map((c: any) => {
-                const meta = (c.metadata as Record<string, any>) || {};
                 return (
                   <tr key={c.id} className="hover:bg-blue-50/20">
                     <td className="px-2 py-4 border-r text-gray-400 font-mono text-center bg-gray-50/10">{c.id}</td>
                     {['name', 'email', 'role'].map((field) => (
                       <td key={field} className="p-0 border-r">
-                        <form action={updateCoreData} className="flex h-full items-center group">
-                          <input type="hidden" name="id" value={c.id} /><input type="hidden" name="field" value={field} />
-                          <input name="value" defaultValue={c[field]} className="w-full p-4 bg-transparent outline-none focus:bg-white text-gray-800" />
-                        </form>
+                        <EditableInput
+                            id={c.id}
+                            field={field}
+                            defaultValue={c[field] || ''}
+                            action={updateCoreData}
+                            className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 focus:outline-none focus:bg-white px-1 py-0.5 rounded transition-all"
+                         />
                       </td>
                     ))}
-                    {allDynamicKeys.map((key) => (
-                      <td key={key} className="p-0 border-r">
-                        <form action={updateMetadataCell} className="flex h-full items-center group">
-                          <input type="hidden" name="id" value={c.id} /><input type="hidden" name="key" value={key} />
-                          <input name="newValue" defaultValue={meta[key] || ""} className="w-full p-4 bg-transparent outline-none focus:bg-white text-blue-700 font-medium" />
-                          <button className="hidden group-focus-within:block px-1 text-[8px] text-green-600 font-bold pr-2">Save</button>
-                        </form>
+                    {allDynamicKeys.map(key => (
+                      <td key={key} className="px-4 py-3">
+                        <EditableInput
+                          id={c.id}
+                          metadataKey={key}
+                          defaultValue={c.metadata?.[key] || ''}
+                          action={updateMetadataCell}
+                          className="w-full bg-transparent border-b border-transparent focus:border-amber-500 focus:outline-none text-indigo-600"
+                        />
                       </td>
                     ))}
                     <td className="p-2 border-r bg-blue-50/30">
@@ -342,13 +298,59 @@ export default async function DashboardPage({
             </tbody>
           </table>
         </div>
+        {/* 分頁按鈕區塊 */}
+<div className="flex justify-center items-center gap-2 mt-6 mb-10">
+  {/* 第一頁 */}
+  <a 
+    href="/dashboard?page=1" 
+    className={`px-3 py-1 border-2 border-slate-800 rounded font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-100 active:translate-y-0.5 ${currentPage === 1 ? 'bg-slate-200 pointer-events-none' : 'bg-white'}`}
+  >
+    FIRST
+  </a>
+
+  {/* 上一頁 */}
+  <a 
+    href={`/dashboard?page=${currentPage - 1}`} 
+    className={`px-3 py-1 border-2 border-slate-800 rounded font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-100 ${currentPage <= 1 ? 'opacity-30 pointer-events-none' : 'bg-white'}`}
+  >
+    PREV
+  </a>
+
+  {/* 頁碼顯示 */}
+  <div className="flex gap-1 px-4 py-1 bg-slate-800 text-white rounded font-mono text-xs">
+    {currentPage} / {totalPages}
+  </div>
+
+  {/* 下一頁 */}
+  <a 
+    href={`/dashboard?page=${currentPage + 1}`} 
+    className={`px-3 py-1 border-2 border-slate-800 rounded font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-100 ${currentPage >= totalPages ? 'opacity-30 pointer-events-none' : 'bg-white'}`}
+  >
+    NEXT
+  </a>
+  {/* <div className="flex gap-1">
+      <a href={`/dashboard?page=${currentPage - 1}`} className={`px-2 py-1 border-2 border-slate-800 text-xs font-bold ${currentPage <= 1 ? 'opacity-30 pointer-events-none' : 'bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}`}>PREV</a>
+      <span className="px-4 py-1 bg-slate-800 text-white text-xs font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">{currentPage} / {totalPages}</span>
+      <a href={`/dashboard?page=${currentPage + 1}`} className={`px-2 py-1 border-2 border-slate-800 text-xs font-bold ${currentPage >= totalPages ? 'opacity-30 pointer-events-none' : 'bg-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}`}>NEXT</a>
+  </div> */}
+
+  {/* 最後一頁 */}
+  <a 
+    href={`/dashboard?page=${totalPages}`} 
+    className={`px-3 py-1 border-2 border-slate-800 rounded font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-100 ${currentPage === totalPages ? 'bg-slate-200 pointer-events-none' : 'bg-white'}`}
+  >
+    LAST
+  </a>
+  {/* ✅ 新增的跳頁 */}
+    <JumpToPage totalPages={totalPages} currentPage={currentPage} />
+</div>
 
 {/* 3. FILTERED RESULTS (CUSTOMER) */}
 <div className="mb-10 animate-in fade-in duration-500">
   <div className="bg-indigo-600 text-white p-2 rounded-t-lg flex justify-between items-center border-x-2 border-t-2 border-indigo-600">
     <h2 className="font-bold uppercase text-[9px] flex items-center gap-2">
       <span className="bg-white text-indigo-600 px-2 py-0.5 rounded-full">Results</span>
-      Customer Search Match ({filteredCustomers.length})
+      Customer Table Search Match ({filteredCustomers.length})
     </h2>
   </div>
   <div className="bg-white shadow-2xl rounded-b-lg overflow-x-auto border-2 border-indigo-600 border-t-0">
@@ -394,29 +396,29 @@ export default async function DashboardPage({
   </div>
 </div>
 
-        {/* 2. FILTER FOR SYNC TABLE */}
+        {/* 2. FILTER FOR customer_info TABLE */}
         <div className="bg-indigo-50 p-4 rounded border border-indigo-100 mb-4">
-          <h2 className="text-[9px] font-bold text-indigo-900 uppercase mb-2">Sync Filter (customer_info)</h2>
+          <h2 className="text-[9px] font-bold text-indigo-900 uppercase mb-2">Table Filter (customer_info)</h2>
           <form action={handleSyncSearch} className="flex gap-2 max-w-2xl">
             <input name="syncId" placeholder="Filter Sync ID" className="border p-2 rounded flex-1 bg-white" defaultValue={syncId} />
             <input name="syncEmail" placeholder="Filter Sync Email" className="border p-2 rounded flex-1 bg-white" defaultValue={syncEmail} />
-            <button type="submit" className="bg-indigo-900 text-white px-6 rounded font-bold uppercase">Sync Search 🔍</button>
+            <button type="submit" className="bg-indigo-900 text-white px-6 rounded font-bold uppercase">Table Search 🔍</button>
           </form>
         </div>
-        {/* SYNC TABLE */}
-        <h2 className="text-sm font-bold mb-3 text-indigo-900 uppercase">Database Sync (customer_info)</h2>
+        {/* customer_info TABLE */}
+        <h2 className="text-sm font-bold mb-3 text-indigo-900 uppercase">Customer_info Table</h2>
         <div className="bg-white shadow rounded border border-indigo-100 max-w-md overflow-hidden">
           <table className="min-w-full text-left">
             <thead className="bg-indigo-900 text-white uppercase text-[8px]">
               <tr>
-                <th className="px-4 py-2 border-r border-indigo-800">Sync ID</th>
-                <th className="px-4 py-2">Email Record (Editable)</th>
+                <th className="px-4 py-2 border-r border-indigo-800">ID</th>
+                <th className="px-4 py-2">Email</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {allSyncRecords.map((c: any) => (
                 <tr key={`sync-${c.id}`} className="hover:bg-indigo-50/30">
-                  <td className="px-4 py-2 font-mono text-gray-400 border-r border-gray-100">ID {c.id}</td>
+                  <td className="px-4 py-2 font-mono text-gray-400 border-r border-gray-100">{c.id}</td>
                   <td className="p-0">
                     <form action={updateSyncEmail} className="flex h-full items-center group">
                       <input type="hidden" name="infoId" value={c.id} />
@@ -433,10 +435,22 @@ export default async function DashboardPage({
             </tbody>
           </table>
         </div>
+        {/* customer_info Results 分頁器 */}
+            <div className="flex items-center gap-1 mb-1">
+              <a href={createURL('syncPage', currentSyncPage - 1)} className={`px-2 py-0.5 border border-slate-800 text-[9px] font-bold ${currentSyncPage <= 1 ? 'opacity-30 pointer-events-none' : 'bg-white shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]'}`}>PREV</a>
+              <span className="text-[9px] font-bold px-2">{currentSyncPage} / {totalSyncPages}</span>
+              <a href={createURL('syncPage', currentSyncPage + 1)} className={`px-2 py-0.5 border border-slate-800 text-[9px] font-bold ${currentSyncPage >= totalSyncPages ? 'opacity-30 pointer-events-none' : 'bg-white shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]'}`}>NEXT</a>
+              {/* ✅ 在 NEXT 右側加入 JumpToPage，並指定 paramName 為 'syncPage' */}
+              <JumpToPage 
+                totalPages={totalSyncPages} 
+                currentPage={currentSyncPage} 
+                paramName="syncPage" 
+              />
+            </div>
 {/* 4. FILTERED RESULTS (SYNC) */}
 <div className="mt-6 animate-in slide-in-from-top-2 duration-300 max-w-md">
   <div className="bg-amber-500 text-white px-4 py-2 rounded-t font-bold uppercase text-[8px] flex justify-between">
-    <span>Filtered Sync Results</span>
+    <span>Customer_info Table Search Results</span>
     <span>{filteredSyncRecords.length} Found</span>
   </div>
   <div className="bg-white shadow border-2 border-amber-500 rounded-b overflow-hidden">
@@ -445,7 +459,7 @@ export default async function DashboardPage({
         <tbody className="divide-y divide-amber-100">
           {filteredSyncRecords.map((s: any) => (
             <tr key={`filtered-sync-${s.id}`} className="bg-amber-50/20">
-              <td className="px-4 py-2 font-mono text-amber-700 border-r border-amber-100">ID {s.id}</td>
+              <td className="px-4 py-2 font-mono text-amber-700 border-r border-amber-100">{s.id}</td>
               <td className="px-4 py-2 italic text-gray-700">{s.email}</td>
             </tr>
           ))}
