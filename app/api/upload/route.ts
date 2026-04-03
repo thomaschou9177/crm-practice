@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
