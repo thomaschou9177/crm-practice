@@ -23,7 +23,7 @@ export default async function DashboardPage(props:{
   const syncSkip = (currentSyncPage - 1) * syncPageSize;
   
  // 固定欄位過濾參數
-  const { id, name, email, role, syncId, syncEmail,age } = params;
+  const { id, name, email, role, syncId, syncEmail} = params;
 
   // --- FETCH ALL DATA ---
   // --- 修改：增加 skip 與 take ---
@@ -48,8 +48,15 @@ export default async function DashboardPage(props:{
   });
 
   // 動態 metadata keys
-  const allDynamicKeys:string[] = Array.from(
-    new Set(allCustomers.flatMap((c: any) => Object.keys((c.metadata as Record<string, any>) || {})))
+   // ✅ 將 metadata key 統一轉成小寫
+  const allDynamicKeys: string[] = Array.from(
+    new Set(
+      allCustomers.flatMap((c: any) =>
+        Object.keys((c.metadata as Record<string, any>) || {}).map((k) =>
+          k.toLowerCase()
+        )
+      )
+    )
   );
 
   // 判斷是否有啟用過濾
@@ -75,23 +82,22 @@ export default async function DashboardPage(props:{
     customerWhere.AND.push({ role: { contains: role, mode: 'insensitive' } });
   }
 
-  // --- JSONB 欄位過濾 (處理 age) ---
-  if (age) {
-    const ageNum = Number(age);
-    if (!isNaN(ageNum)) {
-      customerWhere.AND.push({
-        metadata: {
-          path: ['age'], // 這裡會去 metadata 裡面找 "age" 這個 key
-          equals: ageNum, // 假設資料庫存的是數字，則用數字比對
-        },
-      });
-    }
-  }
-  // ✅ 動態 metadata 條件
+  // ✅ 動態 metadata 條件 (自動判斷數字/字串)
   for (const key of allDynamicKeys) {
     const value = params[key];
-    if (value && value.trim() !== "") {
-      customerWhere.AND.push({ metadata: { path: [key], string_contains: value } });
+    if (value && value.trim() !== '') {
+      const numVal = Number(value);
+      if (!isNaN(numVal)) {
+        // 如果是數字 → 用 equals
+        customerWhere.AND.push({
+          metadata: { path: [key.toLowerCase()], equals: numVal },
+        });
+      } else {
+        // 如果是字串 → 用 string_contains
+        customerWhere.AND.push({
+          metadata: { path: [key.toLowerCase()], string_contains: value },
+        });
+      }
     }
   }
 
