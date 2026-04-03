@@ -10,11 +10,11 @@ import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeCol
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ [key: string]: string | undefined }>;
+  searchParams: Record<string, string | undefined>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
  {
  // ✅ await 解開 Promise
-  const params = await searchParams;
+  const params: Record<string, string | undefined> = searchParams;
   // --- 新增：分頁參數計算 ---
   const pageSize = 50; // 每頁顯示 50 筆
   const currentPage = Number(params.page) || 1;
@@ -50,12 +50,13 @@ export default async function DashboardPage({
   });
 
   // 動態 metadata keys
-  const allDynamicKeys = Array.from(
-    new Set(allCustomers.flatMap((c: any) => Object.keys((c.metadata as object) || {})))
+  const allDynamicKeys:string[] = Array.from(
+    new Set(allCustomers.flatMap((c: any) => Object.keys((c.metadata as Record<string, any>) || {})))
   );
 
   // 判斷是否有啟用過濾
-  const isCustomerFiltering = Object.entries({ id, name, email, role, ...Object.fromEntries(allDynamicKeys.map(k => [k, params[k]])) })
+  const isCustomerFiltering = Object.entries({ id, name, email, role, ...Object.fromEntries(allDynamicKeys.map((k:string) => [k, params[k] as string | undefined])),
+   } as Record<string, string | undefined>)
     .some(([_, v]) => v && v.trim() !== "");
 
   const isSyncFiltering = !!(syncId || syncEmail);
@@ -116,7 +117,13 @@ export default async function DashboardPage({
   });
  // 輔助函式：產生保留現有參數的 URL
   const createURL = (name: string, value: string | number) => {
-    const newParams = new URLSearchParams(params as any);
+    const newParams = new URLSearchParams();
+    // 過濾掉 undefined
+    Object.entries(params).forEach(([k, v]) => {
+    if (typeof v === "string") {
+      newParams.set(k, v);
+    }
+    });
     newParams.set(name, value.toString());
     return `/dashboard?${newParams.toString()}`;
   };
@@ -177,7 +184,7 @@ export default async function DashboardPage({
                 name={key}
                 placeholder={`Meta: ${key}`}
                 className="border p-2 rounded bg-blue-50"
-                defaultValue={params[key]}
+                defaultValue={params[key] }
               />
             ))}
             <button type="submit" className="bg-indigo-600 text-white rounded font-bold uppercase">Table Search 🔍</button>

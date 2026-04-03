@@ -17,7 +17,7 @@ export async function POST(req: Request) {
 
     // 假設 Excel 第一個工作表就是 customer 資料
     const sheetName = workbook.SheetNames[0];
-    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    const rows = XLSX.utils.sheet_to_json<Record<string, any>>(workbook.Sheets[sheetName]);
 
     // 逐筆寫入 customer + customer_info
     // 在循環內加入 try-catch，避免一筆失敗就全盤皆輸
