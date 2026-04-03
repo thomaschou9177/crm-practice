@@ -23,7 +23,7 @@ export default async function DashboardPage(props:{
   const syncSkip = (currentSyncPage - 1) * syncPageSize;
   
  // 固定欄位過濾參數
-  const { id, name, email, role, syncId, syncEmail } = params;
+  const { id, name, email, role, syncId, syncEmail,age } = params;
 
   // --- FETCH ALL DATA ---
   // --- 修改：增加 skip 與 take ---
@@ -75,6 +75,18 @@ export default async function DashboardPage(props:{
     customerWhere.AND.push({ role: { contains: role, mode: 'insensitive' } });
   }
 
+  // --- JSONB 欄位過濾 (處理 age) ---
+  if (age) {
+    const ageNum = Number(age);
+    if (!isNaN(ageNum)) {
+      customerWhere.AND.push({
+        metadata: {
+          path: ['age'], // 這裡會去 metadata 裡面找 "age" 這個 key
+          equals: ageNum, // 假設資料庫存的是數字，則用數字比對
+        },
+      });
+    }
+  }
   // ✅ 動態 metadata 條件
   for (const key of allDynamicKeys) {
     const value = params[key];
