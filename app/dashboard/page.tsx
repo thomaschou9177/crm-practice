@@ -7,14 +7,12 @@ import EditableInput from '@/components/EditableInput';
 import JumpToPage from '@/components/JumpToPage';
 import { prisma } from '@/lib/db';
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Record<string, string | undefined>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
+export default async function DashboardPage(props:{
+  searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
  {
  // ✅ await 解開 Promise
-  const params: Record<string, string | undefined> = searchParams;
+  const params: Record<string, string | undefined> =await props.searchParams;
   // --- 新增：分頁參數計算 ---
   const pageSize = 50; // 每頁顯示 50 筆
   const currentPage = Number(params.page) || 1;
