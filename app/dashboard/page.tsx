@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+import DeleteAllDataButton from '@/components/DeleteAllDataButton';
 import { DeleteColumnButton } from '@/components/DeleteColumnButton';
 import { DeleteRowButton } from '@/components/DeleteRowButton';
 import EditableInput from '@/components/EditableInput';
@@ -366,21 +367,8 @@ export default async function DashboardPage(props:{
   </a>
   {/* ✅ 新增的跳頁 */}
     <JumpToPage totalPages={totalPages} currentPage={currentPage} />
-    <form
-      action="/api/deleteAll"
-      method="post"
-      onSubmit={() =>
-        confirm("⚠️ 確定要刪除所有資料嗎？此操作不可回復！")
-      }
-    >
-      <button
-        type="submit"
-        className="bg-red-600 text-white px-6 py-2 rounded font-bold"
-      >
-        Delete All Data
-      </button>
-    </form>
-
+    
+    <DeleteAllDataButton></DeleteAllDataButton>
 </div>
 
 {/* 3. FILTERED RESULTS (CUSTOMER) */}
