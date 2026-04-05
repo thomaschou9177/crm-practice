@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs"; // ✅ 強制 Node.js runtime
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
@@ -18,8 +18,10 @@ export async function POST(req: Request) {
     const sheetName = workbook.SheetNames[0];
     const rows = XLSX.utils.sheet_to_json<Record<string, any>>(workbook.Sheets[sheetName]);
 
-    const batchSize = 500;
+    const batchSize = 2000; // ✅ 批次大小加大，減少 round-trip 次數
     let processed = 0;
+
+    const promises: Promise<any>[] = [];
 
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize).map((row) => {
@@ -42,23 +44,29 @@ export async function POST(req: Request) {
         };
       }).filter(Boolean) as any[];
 
-      await prisma.customer.createMany({
-        data: batch,
-        skipDuplicates: true,
-      });
+      // ✅ 建立並行任務
+      promises.push(
+        (async () => {
+          await prisma.customer.createMany({
+            data: batch,
+            skipDuplicates: true,
+          });
 
-      const infoBatch = batch.map((c) => ({
-        id: c.id,
-        email: c.email,
-      }));
-      await prisma.customer_info.createMany({
-        data: infoBatch,
-        skipDuplicates: true,
-      });
+          await prisma.customer_info.createMany({
+            data: batch.map((c) => ({ id: c.id, email: c.email })),
+            skipDuplicates: true,
+          });
 
-      processed += batch.length;
-      console.log(`✅ 已完成批次 ${i / batchSize + 1}，累計處理 ${processed} 筆`);
+          processed += batch.length;
+          console.log(`✅ 已完成批次 ${i / batchSize + 1}，累計處理 ${processed} 筆`);
+        })()
+      );
     }
+
+    // ✅ 並行執行所有批次
+    await Promise.all(promises);
+
+    console.log(`🎉 全部完成，共處理 ${processed} 筆`);
 
     return NextResponse.redirect(new URL("/dashboard", req.url));
   } catch (error) {
