@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
@@ -13,65 +13,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
+    // 讀取 Excel，計算總筆數
     const buffer = Buffer.from(await file.arrayBuffer());
     const workbook = XLSX.read(buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const rows = XLSX.utils.sheet_to_json<Record<string, any>>(workbook.Sheets[sheetName]);
+    const total = rows.length;
 
-    const batchSize = 5000; // ✅ 每批 5000 筆
-    const concurrency = 5;  // ✅ 每次並行 5 批
-    let processed = 0;
+    // 上傳到 S3
+    const s3 = new S3Client({ region: process.env.AWS_REGION! });
+    const key = `uploads/${Date.now()}-${file.name}`;
 
-    const tasks: (() => Promise<void>)[] = [];
+    await s3.send(new PutObjectCommand({
+      Bucket: process.env.S3_BUCKET!,
+      Key: key,
+      Body: buffer,
+    }));
 
-    for (let i = 0; i < rows.length; i += batchSize) {
-      const batch = rows.slice(i, i + batchSize).map((row) => {
-        const id = Number(row["id"]);
-        if (isNaN(id)) return null;
-
-        const metadata: Record<string, any> = {};
-        for (const key of Object.keys(row)) {
-          if (!["id", "name", "email", "role"].includes(key)) {
-            metadata[key.toLowerCase()] = row[key];
-          }
-        }
-
-        return {
-          id,
-          name: String(row["name"] || ""),
-          email: String(row["email"] || ""),
-          role: String(row["role"] || ""),
-          metadata,
-        };
-      }).filter(Boolean) as any[];
-
-      tasks.push(async () => {
-        await prisma.customer.createMany({
-          data: batch,
-          skipDuplicates: true,
-        });
-
-        await prisma.customer_info.createMany({
-          data: batch.map((c) => ({ id: c.id, email: c.email })),
-          skipDuplicates: true,
-        });
-
-        processed += batch.length;
-        console.log(`✅ 已完成批次 ${i / batchSize + 1}，累計處理 ${processed} 筆`);
-      });
-    }
-
-    // ✅ 分組並行執行
-    for (let i = 0; i < tasks.length; i += concurrency) {
-      const group = tasks.slice(i, i + concurrency);
-      await Promise.all(group.map((fn) => fn()));
-    }
-
-    console.log(`🎉 全部完成，共處理 ${processed} 筆`);
-
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+    // 回傳檔案 ID 與總筆數
+    return NextResponse.json({ fileId: key, total });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Failed to process Excel file" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
   }
 }

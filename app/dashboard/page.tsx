@@ -5,6 +5,7 @@ import DeleteAllDataButton from '@/components/DeleteAllDataButton';
 import { DeleteColumnButton } from '@/components/DeleteColumnButton';
 import { DeleteRowButton } from '@/components/DeleteRowButton';
 import EditableInput from '@/components/EditableInput';
+import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
 import { prisma } from '@/lib/db';
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
@@ -144,7 +145,7 @@ export default async function DashboardPage(props:{
     newParams.set(name, value.toString());
     return `/dashboard?${newParams.toString()}`;
   };
-
+  
   return (
     <div className="p-8 bg-gray-50 min-h-screen text-black text-[10px]">
       <div className="max-w-[98%] mx-auto">
@@ -156,7 +157,10 @@ export default async function DashboardPage(props:{
         </div>
 
 {/* IMPORT BAR */}
-<div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-4 flex items-center justify-between">
+
+<ImportBar></ImportBar>
+
+{/* <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-4 flex items-center justify-between">
   <h2 className="font-bold text-green-700 uppercase">Import Excel File</h2>
   <form
     action="/api/upload"
@@ -178,7 +182,7 @@ export default async function DashboardPage(props:{
       Upload & Sync
     </button>
   </form>
-</div>
+</div> */}
 
 
 
