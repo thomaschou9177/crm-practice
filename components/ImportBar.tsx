@@ -8,16 +8,17 @@ export default function ImportBar() {
   async function handleUpload(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    try {
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Upload failed");
+        const data = await res.json();
 
-    // 1. 上傳到 S3
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-
-    // 2. 觸發 Worker API，開始匯入 DB
-    await fetch(`/api/worker?fileId=${data.fileId}`);
-
-    // 3. 更新前端進度條
-    setUploadInfo({ fileId: data.fileId, total: data.total });
+        await fetch(`/api/worker?fileId=${data.fileId}`);
+        setUploadInfo({ fileId: data.fileId, total: data.total });
+        } catch (err) {
+        console.error("Upload error:", err);
+        alert("上傳或匯入失敗，請檢查 API log");
+    }
   }
 
   return (

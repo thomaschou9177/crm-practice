@@ -66,12 +66,15 @@ async function processFile(fileId: string) {
   return processed;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    // 假設 fileId 是從 DB 或 queue 取出
-    const fileId = "uploads/1234567890-myfile.xlsx";
-    const processed = await processFile(fileId);
+    const { searchParams } = new URL(req.url);
+    const fileId = searchParams.get("fileId");
+    if (!fileId) {
+      return NextResponse.json({ error: "Missing fileId" }, { status: 400 });
+    }
 
+    const processed = await processFile(fileId);
     return NextResponse.json({ status: "ok", processed });
   } catch (error) {
     console.error(error);
@@ -80,3 +83,4 @@ export async function GET() {
     await prisma.$disconnect();
   }
 }
+
