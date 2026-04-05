@@ -18,10 +18,11 @@ export async function POST(req: Request) {
     const sheetName = workbook.SheetNames[0];
     const rows = XLSX.utils.sheet_to_json<Record<string, any>>(workbook.Sheets[sheetName]);
 
-    const batchSize = 2000; // ✅ 批次大小加大，減少 round-trip 次數
+    const batchSize = 5000; // ✅ 每批 5000 筆
+    const concurrency = 5;  // ✅ 每次並行 5 批
     let processed = 0;
 
-    const promises: Promise<any>[] = [];
+    const tasks: (() => Promise<void>)[] = [];
 
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize).map((row) => {
@@ -44,27 +45,27 @@ export async function POST(req: Request) {
         };
       }).filter(Boolean) as any[];
 
-      // ✅ 建立並行任務
-      promises.push(
-        (async () => {
-          await prisma.customer.createMany({
-            data: batch,
-            skipDuplicates: true,
-          });
+      tasks.push(async () => {
+        await prisma.customer.createMany({
+          data: batch,
+          skipDuplicates: true,
+        });
 
-          await prisma.customer_info.createMany({
-            data: batch.map((c) => ({ id: c.id, email: c.email })),
-            skipDuplicates: true,
-          });
+        await prisma.customer_info.createMany({
+          data: batch.map((c) => ({ id: c.id, email: c.email })),
+          skipDuplicates: true,
+        });
 
-          processed += batch.length;
-          console.log(`✅ 已完成批次 ${i / batchSize + 1}，累計處理 ${processed} 筆`);
-        })()
-      );
+        processed += batch.length;
+        console.log(`✅ 已完成批次 ${i / batchSize + 1}，累計處理 ${processed} 筆`);
+      });
     }
 
-    // ✅ 並行執行所有批次
-    await Promise.all(promises);
+    // ✅ 分組並行執行
+    for (let i = 0; i < tasks.length; i += concurrency) {
+      const group = tasks.slice(i, i + concurrency);
+      await Promise.all(group.map((fn) => fn()));
+    }
 
     console.log(`🎉 全部完成，共處理 ${processed} 筆`);
 
