@@ -10,7 +10,7 @@ export async function processExcel(buffer:ArrayBuffer) {
   const rows = XLSX.utils.sheet_to_json(sheet);
 
   // 4. 批次寫入 DB (同時建立 customer 與 customer_info)
-  const chunkSize = 5000; // 建議縮小批次，避免 transaction 過大
+  const chunkSize = 10000; // 建議縮小批次，避免 transaction 過大
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
 
