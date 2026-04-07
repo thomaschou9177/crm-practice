@@ -29,7 +29,7 @@ export default function ImportBar() {
     },
     body: JSON.stringify({ filePath: filePath  }),
   });
-
+  console.log(filePath)
   if (processRes.ok) {
   alert("資料處理完成！");
   window.location.reload();
