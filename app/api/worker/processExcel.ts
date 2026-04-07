@@ -1,19 +1,8 @@
 import { prisma } from "@/lib/db";
-import { supabaseServer } from "@/lib/supabase-server"; // 後端用 Service Role Key
 import * as XLSX from "xlsx";
 
-export async function processExcel(filePath: string) {
-  // 1. 從 Supabase Storage 下載檔案（用 service role key）
-  const { data, error } = await supabaseServer.storage
-    .from(process.env.NEXT_PUBLIC_SUPABASE_BUCKET!)
-    .download(filePath);
+export async function processExcel(buffer:ArrayBuffer) {
 
-  if (error || !data) {
-    throw new Error("Failed to download file from Supabase Storage");
-  }
-
-  // 2. 轉成 buffer
-  const buffer = await data.arrayBuffer();
 
   // 3. 解析 Excel
   const workbook = XLSX.read(buffer, { type: "buffer" });

@@ -15,8 +15,9 @@ export async function POST(req: Request) {
       .from(process.env.NEXT_PUBLIC_SUPABASE_BUCKET!)
       .download(filePath);
     if (error || !data) throw new Error("Failed to download file");
-    
-    await processExcel(filePath);
+    // 轉成 buffer
+    const buffer = await data.arrayBuffer();
+    await processExcel(buffer);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
