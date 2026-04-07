@@ -1,12 +1,22 @@
+// app/api/process/route.ts
 import { NextResponse } from "next/server";
 import { processExcel } from "../worker/processExcel";
 
 export async function POST(req: Request) {
   try {
     const { filePath } = await req.json();
-    await processExcel(filePath); // 執行你寫好的下載->解析->寫入邏輯
+    console.log("Starting to process file:", filePath);
+    
+    await processExcel(filePath);
+    
+    console.log("Process completed successfully");
     return NextResponse.json({ success: true });
-  } catch (err) {
-    return NextResponse.json({ error: "處理失敗" }, { status: 500 });
+  } catch (err: any) {
+    // 關鍵：將詳細錯誤印出到 Console，Vercel Log 才會顯示
+    console.error("Detailed Error in /api/process:", err.message, err.stack);
+    return NextResponse.json(
+      { error: err.message || "Internal Server Error" }, 
+      { status: 500 }
+    );
   }
 }
