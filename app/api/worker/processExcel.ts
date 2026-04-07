@@ -3,13 +3,26 @@ import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx";
 
 export async function processExcel(filePath: string) {
-  // 1. 從 Supabase Storage 下載檔案
+  const bucketName = process.env.SUPABASE_BUCKET;
+
+  // 增加明確的錯誤檢查
+  if (!bucketName) {
+    throw new Error("環境變數 SUPABASE_BUCKET 未設定，請檢查 Vercel Settings");
+  }
+
+  if (!filePath) {
+    throw new Error("未提供 filePath，無法從 Storage 下載檔案");
+  }
+
+  console.log(`正在從 Bucket: ${bucketName} 下載檔案: ${filePath}`);
+
   const { data, error } = await supabase.storage
-    .from(process.env.SUPABASE_BUCKET!)
+    .from(bucketName)
     .download(filePath);
 
   if (error || !data) {
-    throw new Error("Failed to download file from Supabase Storage");
+    console.error("Supabase 下載失敗詳情:", error);
+    throw new Error(`無法從 Supabase 下載檔案: ${error?.message || "未知錯誤"}`);
   }
 
   // 2. 轉成 buffer
