@@ -19,6 +19,7 @@ export default function ImportBar() {
         body: JSON.stringify({ filename: file.name }),
       });
       const { filePath } = await res.json();
+      console.log("準備上傳檔案到:", filePath);
       if (!filePath) throw new Error("後端未回傳 filePath");
 
       // 2. 上傳檔案到 Supabase Storage
