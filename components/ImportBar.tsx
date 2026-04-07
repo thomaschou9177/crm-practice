@@ -13,7 +13,7 @@ export default function ImportBar() {
       method: "POST",
       body: JSON.stringify({ filename: file.name }),
     });
-    const { url } = await res.json();
+    const { url,filePath } = await res.json();
 
     // 2. 直接 PUT 到 S3
     await fetch(url, {
@@ -21,7 +21,16 @@ export default function ImportBar() {
       body: file,
     });
 
-    alert("File uploaded to S3. Worker will process it.");
+    // 3. 新增：通知後端開始處理 Excel 並寫入 DB
+  const processRes = await fetch("/api/process", {
+    method: "POST",
+    body: JSON.stringify({ filePath }),
+  });
+
+  if (processRes.ok) {
+    alert("資料處理完成！");
+    window.location.reload(); // 重新整理頁面以顯示新資料
+  }
   }
 
   return (
