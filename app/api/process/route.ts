@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     const { data, error } = await supabaseServer.storage
       .from(process.env.NEXT_PUBLIC_SUPABASE_BUCKET!)
       .download(filePath);
-    if (error || !data) throw new Error("Failed to download file");
+    if (error || !data) throw new Error("Failed to download file: ${error?.message}");
     // 轉成 buffer
     const buffer = await data.arrayBuffer();
     await processExcel(buffer);
