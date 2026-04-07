@@ -1,28 +1,15 @@
 import { prisma } from "@/lib/db";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server"; // 後端用 Service Role Key
 import * as XLSX from "xlsx";
 
 export async function processExcel(filePath: string) {
-  const bucketName = process.env.SUPABASE_BUCKET;
-
-  // 增加明確的錯誤檢查
-  if (!bucketName) {
-    throw new Error("環境變數 SUPABASE_BUCKET 未設定，請檢查 Vercel Settings");
-  }
-
-  if (!filePath) {
-    throw new Error("未提供 filePath，無法從 Storage 下載檔案");
-  }
-
-  console.log(`正在從 Bucket: ${bucketName} 下載檔案: ${filePath}`);
-
-  const { data, error } = await supabase.storage
-    .from(bucketName)
+  // 1. 從 Supabase Storage 下載檔案（用 service role key）
+  const { data, error } = await supabaseServer.storage
+    .from(process.env.NEXT_PUBLIC_SUPABASE_BUCKET!)
     .download(filePath);
 
   if (error || !data) {
-    console.error("Supabase 下載失敗詳情:", error);
-    throw new Error(`無法從 Supabase 下載檔案: ${error?.message || "未知錯誤"}`);
+    throw new Error("Failed to download file from Supabase Storage");
   }
 
   // 2. 轉成 buffer
@@ -38,7 +25,6 @@ export async function processExcel(filePath: string) {
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
 
-    // 使用 transaction 保證兩個 table 同步
     await prisma.$transaction(
       chunk.map((r: any) =>
         prisma.customer.create({
