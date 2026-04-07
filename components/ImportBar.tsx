@@ -4,39 +4,68 @@ import { useState } from "react";
 
 export default function ImportBar() {
   const [file, setFile] = useState<File | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false); // 新增：防止重複點擊
 
   async function handleUpload() {
     if (!file) return;
+    setIsProcessing(true); // 開始處理
 
-    // 1. 先向後端要 presigned URL
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      body: JSON.stringify({ filename: file.name }),
-    });
-    const { url,filePath } = await res.json();
-    console.log("準備傳送的路徑:", filePath);
-    // 2. 直接 PUT 到 S3
-    await fetch(url, {
-      method: "PUT",
-      body: file,
-    });
+    try {
+      // --- 檢查點 1: 取得預簽名 URL ---
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: JSON.stringify({ filename: file.name }),
+      });
+      
+      if (!res.ok) throw new Error("無法取得上傳預簽名 URL");
+      
+      const uploadData = await res.json();
+      const { url, filePath } = uploadData;
 
-    // 3. 新增：通知後端開始處理 Excel 並寫入 DB
-  const processRes = await fetch("/api/process", {
-    method: "POST",
-    headers: {
-    "Content-Type": "application/json", // 必須加上這一行
-    },
-    body: JSON.stringify({ filePath: filePath  }),
-  });
-  console.log(filePath)
-  if (processRes.ok) {
-  alert("資料處理完成！");
-  window.location.reload();
-} else {
-  const errorData = await processRes.json();
-  alert("處理失敗: " + errorData.error);
-}
+      // 🔍 核心偵錯點：確認 filePath 是否真的存在
+      console.log("檢查點 1 (Upload API 回傳):", uploadData);
+      if (!filePath) {
+        throw new Error("後端 /api/upload 未回傳 filePath，請檢查該 API 邏輯");
+      }
+
+      // --- 檢查點 2: 上傳至 S3/Supabase Storage ---
+      const uploadRes = await fetch(url, {
+        method: "PUT",
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`檔案上傳失敗 (HTTP ${uploadRes.status})`);
+      }
+      console.log("檢查點 2: 檔案已成功 PUT 到儲存空間");
+
+      // --- 檢查點 3: 觸發後端解析 ---
+      console.log("檢查點 3: 準備發送至 /api/process，路徑為:", filePath);
+      
+      const processRes = await fetch("/api/process", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ filePath: filePath }), // 確保 Key 名稱對齊
+      });
+
+      const result = await processRes.json();
+
+      if (processRes.ok) {
+        alert("資料處理完成！");
+        window.location.reload();
+      } else {
+        // 這裡會抓到您在 Log 中看到的 "未提供 filePath" 等錯誤
+        throw new Error(result.error || "後端解析過程發生錯誤");
+      }
+
+    } catch (err: any) {
+      console.error("上傳流程中斷:", err.message);
+      alert("處理失敗: " + err.message);
+    } finally {
+      setIsProcessing(false); // 結束處理
+    }
   }
 
   return (
@@ -44,13 +73,17 @@ export default function ImportBar() {
       <input
         type="file"
         accept=".xlsx,.xls"
+        disabled={isProcessing}
         onChange={(e) => setFile(e.target.files?.[0] || null)}
       />
       <button
         onClick={handleUpload}
-        className="bg-green-600 text-white px-4 py-2 rounded font-bold"
+        disabled={!file || isProcessing}
+        className={`${
+          isProcessing ? "bg-gray-400" : "bg-green-600"
+        } text-white px-4 py-2 rounded font-bold transition-colors`}
       >
-        Upload to S3
+        {isProcessing ? "處理中..." : "Upload to S3"}
       </button>
     </div>
   );

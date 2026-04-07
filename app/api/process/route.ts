@@ -1,21 +1,33 @@
+// app/api/process/route.ts
 import { NextResponse } from "next/server";
-import { processExcel } from "../worker/processExcel";
+import { processExcel } from "../worker/processExcel"; // 請確認 processExcel.ts 的實際存放路徑
 
-// app/api/process/route.ts 修改建議
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    console.log("收到的 Body 內容:", body); // 增加此行進行除錯
-    
-    const { filePath } = body;
-    
-    // 檢查 filePath 是否真的存在
-    if (!filePath) {
-      console.error("錯誤：Request body 中缺少 filePath");
-      return NextResponse.json({ error: "未提供 filePath" }, { status: 400 });
+    // 確保內容類型正確
+    const contentType = req.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      return NextResponse.json({ error: "Content-Type must be application/json" }, { status: 400 });
     }
 
+    // 嘗試讀取 Text 再解析，避免 req.json() 直接失敗
+    const rawBody = await req.text();
+    console.log("Raw Body received:", rawBody); // 這裡如果印出空字串，就是前端沒傳成功
+
+    if (!rawBody) {
+      return NextResponse.json({ error: "Empty request body" }, { status: 400 });
+    }
+
+    const body = JSON.parse(rawBody);
+    const { filePath } = body;
+
+    if (!filePath) {
+      return NextResponse.json({ error: "Missing filePath in body" }, { status: 400 });
+    }
+
+    console.log("Starting to process file:", filePath);
     await processExcel(filePath);
+    
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("Detailed Error in /api/process:", err.message);
