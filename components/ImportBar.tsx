@@ -49,6 +49,16 @@ export default function ImportBar() {
         },
         body: JSON.stringify({ filePath: filePath }), // 確保 Key 名稱對齊
       });
+      // 不要直接 await processRes.json()，先檢查狀態
+      if (processRes.ok) {
+        alert("資料處理完成！");
+        window.location.reload();
+      } else {
+        // 如果超時，status 可能是 504
+        const errorText = await processRes.text(); 
+        console.error("後端回傳內容:", errorText);
+        throw new Error(`伺服器回應錯誤 (${processRes.status}): ${errorText.slice(0, 100)}`);
+      }
       // 增加詳細檢查
       console.log("API 狀態碼:", processRes.status);
 
