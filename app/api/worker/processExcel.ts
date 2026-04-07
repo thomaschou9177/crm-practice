@@ -25,7 +25,8 @@ export async function processExcel(buffer:ArrayBuffer) {
             metadata: {},
             customer_info: {
               create: {
-                id: Number(r.id),
+                // 移除 id: Number(r.id),
+                // id: Number(r.id),
                 email: r.email,
               },
             },
