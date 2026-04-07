@@ -19,12 +19,14 @@ export default function ImportBar() {
         body: JSON.stringify({ filename: file.name }),
       });
       const { filePath } = await res.json();
+      console.log("Bucket:", process.env.NEXT_PUBLIC_SUPABASE_BUCKET);
+      console.log("FilePath:", filePath);
       console.log("準備上傳檔案到:", filePath);
       if (!filePath) throw new Error("後端未回傳 filePath");
 
       // 2. 上傳檔案到 Supabase Storage
       const { error } = await supabase.storage
-        .from(process.env.NEXT_PUBLIC_SUPABASE_BUCKET!)
+        .from(process.env.SUPABASE_BUCKET!)
         .upload(filePath, file);
 
       if (error) throw error;
