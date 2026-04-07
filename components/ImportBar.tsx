@@ -21,6 +21,7 @@ export default function ImportBar() {
       const { filePath } = await res.json();
       console.log("Bucket:", process.env.NEXT_PUBLIC_SUPABASE_BUCKET);
       console.log("FilePath:", filePath);
+      console.log("Bucket:", process.env.NEXT_PUBLIC_SUPABASE_BUCKET);
       console.log("準備上傳檔案到:", filePath);
       if (!filePath) throw new Error("後端未回傳 filePath");
 
