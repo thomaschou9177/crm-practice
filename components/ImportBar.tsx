@@ -24,6 +24,9 @@ export default function ImportBar() {
     // 3. 新增：通知後端開始處理 Excel 並寫入 DB
   const processRes = await fetch("/api/process", {
     method: "POST",
+    headers: {
+    "Content-Type": "application/json", // 必須加上這一行
+    },
     body: JSON.stringify({ filePath }),
   });
 

@@ -1,22 +1,24 @@
-// app/api/process/route.ts
 import { NextResponse } from "next/server";
 import { processExcel } from "../worker/processExcel";
 
+// app/api/process/route.ts 修改建議
 export async function POST(req: Request) {
   try {
-    const { filePath } = await req.json();
-    console.log("Starting to process file:", filePath);
+    const body = await req.json();
+    console.log("收到的 Body 內容:", body); // 增加此行進行除錯
     
+    const { filePath } = body;
+    
+    // 檢查 filePath 是否真的存在
+    if (!filePath) {
+      console.error("錯誤：Request body 中缺少 filePath");
+      return NextResponse.json({ error: "未提供 filePath" }, { status: 400 });
+    }
+
     await processExcel(filePath);
-    
-    console.log("Process completed successfully");
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    // 關鍵：將詳細錯誤印出到 Console，Vercel Log 才會顯示
-    console.error("Detailed Error in /api/process:", err.message, err.stack);
-    return NextResponse.json(
-      { error: err.message || "Internal Server Error" }, 
-      { status: 500 }
-    );
+    console.error("Detailed Error in /api/process:", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
