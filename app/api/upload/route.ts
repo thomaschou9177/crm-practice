@@ -1,17 +1,21 @@
 // app/api/upload/route.ts
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
-
-const s3 = new S3Client({ region: "ap-northeast-1" });
 
 export async function POST(req: Request) {
   const { filename } = await req.json();
-  const command = new PutObjectCommand({
-    Bucket: process.env.S3_BUCKET!,
-    Key: `uploads/${Date.now()}-${filename}`,
-  });
 
-  const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-  return NextResponse.json({ url });
+  // 建立一個 signed URL 或直接回傳 bucket 路徑
+  const filePath = `uploads/${Date.now()}-${filename}`;
+
+  // 產生一個可用來上傳的 signed URL
+  const { data, error } = await supabase.storage
+    .from(process.env.SUPABASE_BUCKET!)
+    .createSignedUploadUrl(filePath);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ url: data.signedUrl, path: filePath });
 }

@@ -1,26 +1,20 @@
 // worker/processExcel.ts
 import { prisma } from "@/lib/db";
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { Readable } from "stream";
+import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx";
 
-const s3 = new S3Client({ region: "ap-northeast-1" });
+export async function processExcel(filePath: string) {
+  // 1. 從 Supabase Storage 下載檔案
+  const { data, error } = await supabase.storage
+    .from(process.env.SUPABASE_BUCKET!)
+    .download(filePath);
 
-export async function processExcel(key: string) {
-  // 1. 從 S3 讀取檔案
-  const command = new GetObjectCommand({
-    Bucket: process.env.S3_BUCKET!,
-    Key: key,
-  });
-  const data = await s3.send(command);
-  const stream = data.Body as Readable;
+  if (error || !data) {
+    throw new Error("Failed to download file from Supabase Storage");
+  }
 
   // 2. 轉成 buffer
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk as Buffer);
-  }
-  const buffer = Buffer.concat(chunks);
+  const buffer = await data.arrayBuffer();
 
   // 3. 解析 Excel
   const workbook = XLSX.read(buffer, { type: "buffer" });
