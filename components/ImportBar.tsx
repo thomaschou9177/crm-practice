@@ -49,6 +49,8 @@ export default function ImportBar() {
         },
         body: JSON.stringify({ filePath: filePath }), // 確保 Key 名稱對齊
       });
+      // 增加詳細檢查
+      console.log("API 狀態碼:", processRes.status);
 
       const result = await processRes.json();
 
