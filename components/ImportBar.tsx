@@ -14,7 +14,7 @@ export default function ImportBar() {
       body: JSON.stringify({ filename: file.name }),
     });
     const { url,filePath } = await res.json();
-
+    console.log("準備傳送的路徑:", filePath);
     // 2. 直接 PUT 到 S3
     await fetch(url, {
       method: "PUT",
@@ -27,13 +27,16 @@ export default function ImportBar() {
     headers: {
     "Content-Type": "application/json", // 必須加上這一行
     },
-    body: JSON.stringify({ filePath }),
+    body: JSON.stringify({ filePath: filePath  }),
   });
 
   if (processRes.ok) {
-    alert("資料處理完成！");
-    window.location.reload(); // 重新整理頁面以顯示新資料
-  }
+  alert("資料處理完成！");
+  window.location.reload();
+} else {
+  const errorData = await processRes.json();
+  alert("處理失敗: " + errorData.error);
+}
   }
 
   return (
