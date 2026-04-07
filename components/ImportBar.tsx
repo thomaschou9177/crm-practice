@@ -26,7 +26,7 @@ export default function ImportBar() {
 
       // 2. 上傳檔案到 Supabase Storage
       const { error } = await supabase.storage
-        .from(process.env.SUPABASE_BUCKET!)
+        .from(process.env.NEXT_PUBLIC_SUPABASE_BUCKET!)
         .upload(filePath, file);
 
       if (error) throw error;
