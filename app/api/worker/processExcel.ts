@@ -1,39 +1,63 @@
 import { prisma } from "@/lib/db";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+import { Readable } from "stream";
 
-export async function processExcel(buffer:ArrayBuffer) {
+interface CustomerRow {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+}
 
+export async function processExcel(buffer: ArrayBuffer): Promise<void> {
+  // 1. 把 ArrayBuffer 包裝成 Readable Stream
+  const stream = Readable.from(Buffer.from(buffer));
 
-  // 3. 解析 Excel
-  const workbook = XLSX.read(buffer, { type: "buffer" });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.read(stream); // 用 stream 載入，不用 Buffer/Uint8Array
 
-  // 4. 批次寫入 DB (同時建立 customer 與 customer_info)
-  const chunkSize = 10000; // 建議縮小批次，避免 transaction 過大
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize);
-
-     // 批次插入 customer
-    await prisma.customer.createMany({
-      data: chunk.map((r: any) => ({
-        id: Number(r.id),
-        name: r.name,
-        email: r.email,
-        role: r.role,
-      })),
-      skipDuplicates: true,
-    });
-
-    // 批次插入 customer_info
-    await prisma.customerInfo.createMany({
-      data: chunk.map((r: any) => ({
-        customerId: Number(r.id),
-        email: r.email,
-      })),
-      skipDuplicates: true,
-    });
-
-    console.log(`Inserted ${i + chunk.length} / ${rows.length}`);
+  // 2. 取得第一個工作表
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) {
+    throw new Error("Excel 檔案沒有工作表");
   }
+
+  // 3. 流式逐行讀取 + 批次寫入
+  const batch: CustomerRow[] = [];
+  const chunkSize = 5000;
+  let processed = 0;
+
+  for (let rowIndex = 2; rowIndex <= worksheet.rowCount; rowIndex++) {
+    const row = worksheet.getRow(rowIndex);
+
+    const id = Number(row.getCell(1).value ?? 0);
+    const name = String(row.getCell(2).value ?? "");
+    const email = String(row.getCell(3).value ?? "");
+    const role = String(row.getCell(4).value ?? "");
+
+    batch.push({ id, name, email, role });
+
+    if (batch.length >= chunkSize) {
+      await insertBatch(batch);
+      processed += batch.length;
+      console.log(`Inserted ${processed} / ${worksheet.rowCount}`);
+      batch.length = 0;
+    }
+  }
+
+  if (batch.length > 0) {
+    await insertBatch(batch);
+    processed += batch.length;
+    console.log(`Inserted ${processed} / ${worksheet.rowCount}`);
+  }
+
+  console.log("✅ Excel 處理完成");
+}
+
+async function insertBatch(batch: CustomerRow[]): Promise<void> {
+  await prisma.customer.createMany({ data: batch, skipDuplicates: true });
+  await prisma.customerInfo.createMany({
+    data: batch.map((r) => ({ customerId: r.id, email: r.email })),
+    skipDuplicates: true,
+  });
 }
