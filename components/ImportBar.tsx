@@ -1,4 +1,3 @@
-// src/components/ImportBar.tsx
 "use client";
 import { createClient } from "@supabase/supabase-js";
 import { useState } from "react";
@@ -30,61 +29,20 @@ export default function ImportBar() {
       return;
     }
 
-    // 呼叫後端 API，只傳檔名，不傳檔案
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: file.name }),
-    });
+    // 呼叫 Supabase Edge Function，而不是 Vercel API
+    const res = await fetch(
+      "https://htlqcgfgazlmjlyqibik.functions.supabase.co/processExcel",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name }),
+      }
+    );
 
     const data = await res.json();
-    setFilename(data.filename);
-    setTotalRows(data.totalRows);
-    setProcessedRows(0);
-
-    // 上傳完成後自動開始批次處理
-    autoProcess(data.filename, data.totalRows, 500, 2); // 每批 500 筆，並行 2 批
-  };
-
-  // 自動批次處理（支援並行 + 錯誤重試）
-  const autoProcess = async (
-    filename: string,
-    totalRows: number,
-    batchSize: number,
-    concurrency: number
-  ) => {
-    setIsProcessing(true);
-    let batchIndex = 0;
-
-    const runBatch = async (index: number, retries = 3) => {
-      try {
-        const res = await fetch("/api/process", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename, batchIndex: index, batchSize }),
-        });
-
-        const data = await res.json();
-        setProcessedRows((prev) => prev + data.processed);
-      } catch (err) {
-        if (retries > 0) {
-          console.warn(`Batch ${index} failed, retrying...`);
-          await runBatch(index, retries - 1);
-        } else {
-          console.error(`Batch ${index} failed after retries`);
-        }
-      }
-    };
-
-    while (batchIndex * batchSize < totalRows) {
-      const tasks = [];
-      for (let i = 0; i < concurrency && batchIndex * batchSize < totalRows; i++) {
-        tasks.push(runBatch(batchIndex));
-        batchIndex++;
-      }
-      await Promise.all(tasks); // 並行執行多批次
-    }
-
+    setFilename(file.name);
+    setTotalRows(data.totalRows || 0);
+    setProcessedRows(data.processedRows || 0);
     setIsProcessing(false);
   };
 
