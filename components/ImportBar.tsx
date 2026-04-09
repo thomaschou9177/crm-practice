@@ -43,10 +43,10 @@ export default function ImportBar() {
     setProcessedRows(0);
 
     // 上傳完成後自動開始批次處理
-    autoProcess(data.filename, data.totalRows, 1000, 3); // 每批 1000 筆，並行 3 批
+    autoProcess(data.filename, data.totalRows, 500, 2); // 每批 500 筆，並行 2 批
   };
 
-  // 自動批次處理（支援並行）
+  // 自動批次處理（支援並行 + 錯誤重試）
   const autoProcess = async (
     filename: string,
     totalRows: number,
@@ -56,15 +56,24 @@ export default function ImportBar() {
     setIsProcessing(true);
     let batchIndex = 0;
 
-    const runBatch = async (index: number) => {
-      const res = await fetch("/api/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, batchIndex: index, batchSize }),
-      });
+    const runBatch = async (index: number, retries = 3) => {
+      try {
+        const res = await fetch("/api/process", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename, batchIndex: index, batchSize }),
+        });
 
-      const data = await res.json();
-      setProcessedRows((prev) => prev + data.processed);
+        const data = await res.json();
+        setProcessedRows((prev) => prev + data.processed);
+      } catch (err) {
+        if (retries > 0) {
+          console.warn(`Batch ${index} failed, retrying...`);
+          await runBatch(index, retries - 1);
+        } else {
+          console.error(`Batch ${index} failed after retries`);
+        }
+      }
     };
 
     while (batchIndex * batchSize < totalRows) {

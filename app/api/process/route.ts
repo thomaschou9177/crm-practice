@@ -59,19 +59,12 @@ export async function POST(req: Request) {
       });
     }
 
-    // 批次插入，避免逐筆寫入
-    if (batchData.length > 0) {
-      await prisma.customer.createMany({
-        data: batchData,
-        skipDuplicates: true,
-      });
-    }
-
-    if (batchInfoData.length > 0) {
-      await prisma.customer_info.createMany({
-        data: batchInfoData,
-        skipDuplicates: true,
-      });
+    // 使用 transaction 批量插入，避免逐筆寫入
+    if (batchData.length > 0 || batchInfoData.length > 0) {
+      await prisma.$transaction([
+        prisma.customer.createMany({ data: batchData, skipDuplicates: true }),
+        prisma.customer_info.createMany({ data: batchInfoData, skipDuplicates: true }),
+      ]);
     }
 
     return NextResponse.json({ processed: batchData.length });
