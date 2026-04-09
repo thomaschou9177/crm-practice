@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 export async function POST(req: Request) {
   const { filename, batchIndex, batchSize } = await req.json();
 
-  const { data,error } = await supabase.storage.from("uploads").download(filename);
+  const { data,error } = await supabase.storage.from("crm-bucket").download(filename);
   if (error || !data) {
   return NextResponse.json({ error: "File not found or download failed" }, { status: 404 });
 }
