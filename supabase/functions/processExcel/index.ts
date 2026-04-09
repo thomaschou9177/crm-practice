@@ -65,10 +65,10 @@ Deno.serve(async (req) => {
     })
 
     // 執行 Upsert (建議分批，如果是 100 萬筆請參考之前的批次邏輯)
-    const { error: err1 } = await supabaseAdmin.from('Customer').upsert(customers, { onConflict: 'id' })
+    const { error: err1 } = await supabaseAdmin.from('customer').upsert(customers, { onConflict: 'id' })
     if (err1) throw err1
 
-    const { error: err2 } = await supabaseAdmin.from('Customer_info').upsert(infos, { onConflict: 'id' })
+    const { error: err2 } = await supabaseAdmin.from('customer_info').upsert(infos, { onConflict: 'id' })
     if (err2) throw err2
 
     return new Response(
