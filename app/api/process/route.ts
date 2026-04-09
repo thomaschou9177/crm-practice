@@ -20,18 +20,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "File not found", details: error?.message }, { status: 404 });
     }
 
-    // 建立 streaming reader
     const buffer = await data.arrayBuffer();
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
     const worksheet = workbook.worksheets[0];
 
-    let startRow = batchIndex * batchSize + 2; // 跳過標題列
-    let endRow = startRow + batchSize - 1;
-    let processed = 0;
+    const startRow = batchIndex * batchSize + 2; // 跳過標題列
+    const endRow = Math.min(startRow + batchSize - 1, worksheet.rowCount);
 
-    // 逐行讀取並直接寫入 DB
-    for (let rowNumber = startRow; rowNumber <= endRow && rowNumber <= worksheet.rowCount; rowNumber++) {
+    const batchData: any[] = [];
+    const batchInfoData: any[] = [];
+
+    for (let rowNumber = startRow; rowNumber <= endRow; rowNumber++) {
       const row = worksheet.getRow(rowNumber);
       if (!row || row.cellCount === 0) continue;
 
@@ -41,33 +41,40 @@ export async function POST(req: Request) {
         r[header] = cell.value;
       });
 
-      // 寫入 customer
-      await prisma.customer.create({
-        data: {
-          id: Number(r.id),
-          name: String(r.name || ""),
-          email: String(r.email || ""),
-          role: String(r.role || ""),
-          metadata: {
-            age: r.age,
-            birthday: r.birthday,
-            education: r.education,
-          },
+      batchData.push({
+        id: Number(r.id),
+        name: String(r.name || ""),
+        email: String(r.email || ""),
+        role: String(r.role || ""),
+        metadata: {
+          age: r.age,
+          birthday: r.birthday,
+          education: r.education,
         },
       });
 
-      // 寫入 customer_info
-      await prisma.customer_info.create({
-        data: {
-          id: Number(r.id),
-          email: String(r.email || ""),
-        },
+      batchInfoData.push({
+        id: Number(r.id),
+        email: String(r.email || ""),
       });
-
-      processed++;
     }
 
-    return NextResponse.json({ processed });
+    // 批次插入，避免逐筆寫入
+    if (batchData.length > 0) {
+      await prisma.customer.createMany({
+        data: batchData,
+        skipDuplicates: true,
+      });
+    }
+
+    if (batchInfoData.length > 0) {
+      await prisma.customer_info.createMany({
+        data: batchInfoData,
+        skipDuplicates: true,
+      });
+    }
+
+    return NextResponse.json({ processed: batchData.length });
   } catch (err: any) {
     console.error(err);
     return NextResponse.json({

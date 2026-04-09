@@ -43,25 +43,37 @@ export default function ImportBar() {
     setProcessedRows(0);
 
     // 上傳完成後自動開始批次處理
-    autoProcess(data.filename, data.totalRows, 5000);
+    autoProcess(data.filename, data.totalRows, 1000, 3); // 每批 1000 筆，並行 3 批
   };
 
-  // 自動批次處理
-  const autoProcess = async (filename: string, totalRows: number, batchSize: number) => {
+  // 自動批次處理（支援並行）
+  const autoProcess = async (
+    filename: string,
+    totalRows: number,
+    batchSize: number,
+    concurrency: number
+  ) => {
     setIsProcessing(true);
     let batchIndex = 0;
 
-    while (batchIndex * batchSize < totalRows) {
+    const runBatch = async (index: number) => {
       const res = await fetch("/api/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, batchIndex, batchSize }),
+        body: JSON.stringify({ filename, batchIndex: index, batchSize }),
       });
 
       const data = await res.json();
       setProcessedRows((prev) => prev + data.processed);
+    };
 
-      batchIndex++;
+    while (batchIndex * batchSize < totalRows) {
+      const tasks = [];
+      for (let i = 0; i < concurrency && batchIndex * batchSize < totalRows; i++) {
+        tasks.push(runBatch(batchIndex));
+        batchIndex++;
+      }
+      await Promise.all(tasks); // 並行執行多批次
     }
 
     setIsProcessing(false);
