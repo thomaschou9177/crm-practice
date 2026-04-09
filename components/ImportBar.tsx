@@ -1,6 +1,12 @@
 "use client";
+import { createClient } from "@supabase/supabase-js";
 import { useState } from "react";
 import ProgressBar from "./ProgressBar";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function ImportBar() {
   const [file, setFile] = useState<File | null>(null);
@@ -9,15 +15,28 @@ export default function ImportBar() {
   const [processedRows, setProcessedRows] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // 上傳 Excel 檔案
+  // 上傳 Excel 檔案到 Supabase Storage
   const handleUpload = async () => {
     if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
 
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const path = `uploads/${file.name}`;
+    const { error } = await supabase.storage
+      .from("crm-bucket")
+      .upload(path, file, { upsert: true });
+
+    if (error) {
+      alert("上傳失敗: " + error.message);
+      return;
+    }
+
+    // 呼叫後端 API，只傳檔名，不傳檔案
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name }),
+    });
+
     const data = await res.json();
-
     setFilename(data.filename);
     setTotalRows(data.totalRows);
     setProcessedRows(0);
