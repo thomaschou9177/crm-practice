@@ -1,8 +1,8 @@
 // src/app/api/process/route.ts
 import { prisma } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
+import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
-import * as XLSX from "xlsx";
 
 export async function POST(req: Request) {
   try {
@@ -20,41 +20,54 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "File not found", details: error?.message }, { status: 404 });
     }
 
+    // 建立 streaming reader
     const buffer = await data.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const worksheet = workbook.worksheets[0];
 
-    const batch = rows.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
+    let startRow = batchIndex * batchSize + 2; // 跳過標題列
+    let endRow = startRow + batchSize - 1;
+    let processed = 0;
 
-    const customerData = batch.map((r: any) => ({
-      id: Number(r.id),
-      name: String(r.name || ""),
-      email: String(r.email || ""),
-      role: String(r.role || ""),
-      metadata: {
-        age: r.age,
-        birthday: r.birthday,
-        education: r.education,
-      },
-    }));
+    // 逐行讀取並直接寫入 DB
+    for (let rowNumber = startRow; rowNumber <= endRow && rowNumber <= worksheet.rowCount; rowNumber++) {
+      const row = worksheet.getRow(rowNumber);
+      if (!row || row.cellCount === 0) continue;
 
-    const customerInfoData = batch.map((r: any) => ({
-      id: Number(r.id),
-      email: String(r.email || ""),
-    }));
+      const r: any = {};
+      row.eachCell((cell, colNumber) => {
+        const header = worksheet.getRow(1).getCell(colNumber).value as string;
+        r[header] = cell.value;
+      });
 
-    await prisma.customer.createMany({
-      data: customerData,
-      skipDuplicates: true,
-    });
+      // 寫入 customer
+      await prisma.customer.create({
+        data: {
+          id: Number(r.id),
+          name: String(r.name || ""),
+          email: String(r.email || ""),
+          role: String(r.role || ""),
+          metadata: {
+            age: r.age,
+            birthday: r.birthday,
+            education: r.education,
+          },
+        },
+      });
 
-    await prisma.customer_info.createMany({
-      data: customerInfoData,
-      skipDuplicates: true,
-    });
+      // 寫入 customer_info
+      await prisma.customer_info.create({
+        data: {
+          id: Number(r.id),
+          email: String(r.email || ""),
+        },
+      });
 
-    return NextResponse.json({ processed: batch.length });
+      processed++;
+    }
+
+    return NextResponse.json({ processed });
   } catch (err: any) {
     console.error(err);
     return NextResponse.json({
