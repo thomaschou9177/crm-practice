@@ -6,17 +6,35 @@
 
 console.log("Hello from Functions!")
 
-Deno.serve(async (req:Request) => {
-  const { name } = await req.json()
-  const data = {
-    message: `Hello ${name}!`,
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    // 處理 Preflight 請求
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    });
   }
 
-  return new Response(
-    JSON.stringify(data),
-    { headers: { "Content-Type": "application/json" } },
-  )
-})
+  const { filename } = await req.json();
+
+  const data = {
+    message: `Processing file: ${filename}`,
+    totalRows: 1000,
+    processedRows: 0,
+  };
+
+  return new Response(JSON.stringify(data), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*", // 允許跨網域
+    },
+  });
+});
+
 
 /* To invoke locally:
 
