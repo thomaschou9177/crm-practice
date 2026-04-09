@@ -46,9 +46,12 @@ export default function ImportBar() {
         body: JSON.stringify({ filename: file.name }),
       }
     );
-
+    const data = await res.json();
+    console.log("後端回傳:", data); // 先看這裡印出什麼
     if (res.ok) {
       alert("檔案已成功提交！後端正在處理百萬筆資料，這可能需要幾分鐘，請稍後刷新頁面。");
+      setTotalRows(data.totalRows || 0);
+      setProcessedRows(data.totalRows || 0);
     } else {
       const errData = await res.json();
       throw new Error(errData.message || "觸發失敗");
