@@ -12,8 +12,6 @@ Deno.serve(async (req) => {
 
   try {
     const { filename } = await req.json()
-    console.log(`開始處理檔案: ${filename}`)
-
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' 
@@ -23,7 +21,7 @@ Deno.serve(async (req) => {
       .from('crm-bucket')
       .download(`uploads/${filename}`)
 
-    if (downloadError) throw new Error(`下載失敗: ${downloadError.message}`)
+    if (downloadError) throw new Error(`Download error: ${downloadError.message}`)
 
     const arrayBuffer = await fileData.arrayBuffer()
     const workbook = new ExcelJS.Workbook()
@@ -33,48 +31,45 @@ Deno.serve(async (req) => {
     const customers = []
     const infos = []
     
-    // 取得標題列 (第一行) 來尋找欄位索引
+    // 找出標題索引 (避免硬編碼欄位順序)
     const headerRow = worksheet.getRow(1)
     const colMap: Record<string, number> = {}
     headerRow.eachCell((cell, colNumber) => {
-      colMap[String(cell.value).toLowerCase()] = colNumber
+      const val = cell.value ? String(cell.value).toLowerCase().trim() : ""
+      colMap[val] = colNumber
     })
-
-    console.log("偵測到的欄位:", colMap)
 
     worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return
+      if (rowNumber === 1) return // 跳過標題列
 
-      // 安全地抓取數值
-      const getValue = (key: string) => row.getCell(colMap[key] || 0).value
-      
-      const rawId = getValue('id')
-      if (!rawId) return // 跳過沒有 ID 的行
+      // --- 修正重點：確保 id 有被定義 ---
+      const idValue = row.getCell(colMap['id']).value
+      if (idValue === null || idValue === undefined) return // 略過沒 ID 的行
 
-      const customerObj = {
-        id: Number(rawId),
-        name: String(getValue('name') || ""),
-        email: String(getValue('email') || ""),
-        role: String(getValue('role') || ""),
+      const id = Number(idValue) // 在這裡宣告 id
+      const email = String(row.getCell(colMap['email']).value || "")
+
+      customers.push({
+        id: id, // 現在 id 被定義了
+        name: String(row.getCell(colMap['name']).value || ""),
+        email: email,
+        role: String(row.getCell(colMap['role']).value || ""),
         metadata: {
-          age: getValue('age'),
-          birthday: getValue('birthday'),
-          education: getValue('education')
+          age: row.getCell(colMap['age']).value,
+          birthday: row.getCell(colMap['birthday']).value,
+          education: row.getCell(colMap['education']).value
         }
-      }
+      })
 
-      customers.push(customerObj)
-      infos.push({ id: Number(rawId), email: String(getValue('email') || "") })
+      infos.push({ id, email })
     })
 
-    console.log(`準備寫入 ${customers.length} 筆資料`)
+    // 執行 Upsert (建議分批，如果是 100 萬筆請參考之前的批次邏輯)
+    const { error: err1 } = await supabaseAdmin.from('Customer').upsert(customers, { onConflict: 'id' })
+    if (err1) throw err1
 
-    // 執行寫入
-    const { error: insertErr } = await supabaseAdmin.from('Customer').upsert(customers, { onConflict: 'id' })
-    if (insertErr) throw insertErr
-
-    const { error: infoErr } = await supabaseAdmin.from('Customer_info').upsert(infos, { onConflict: 'id' })
-    if (infoErr) throw infoErr
+    const { error: err2 } = await supabaseAdmin.from('Customer_info').upsert(infos, { onConflict: 'id' })
+    if (err2) throw err2
 
     return new Response(
       JSON.stringify({ message: "Success", totalRows: customers.length }),
@@ -82,7 +77,7 @@ Deno.serve(async (req) => {
     )
 
   } catch (err: any) {
-    console.error("發生錯誤:", err.message)
+    console.error("Error detail:", err.message)
     return new Response(
       JSON.stringify({ error: err.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
