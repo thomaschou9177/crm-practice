@@ -21,4 +21,4 @@ model customer_info {
   email    String
   customer customer @relation(fields: [id], references: [id], onDelete: Cascade)
 }
- 
+  
