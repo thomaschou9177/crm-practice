@@ -17,36 +17,47 @@ export default function ImportBar() {
 
   // 上傳 Excel 檔案到 Supabase Storage
   const handleUpload = async () => {
-    if (!file) return;
+  if (!file) return;
+  setIsProcessing(true);
 
-    const path = `uploads/${file.name}`;
-    const { error } = await supabase.storage
-      .from("crm-bucket")
-      .upload(path, file, { upsert: true });
+  // 1. 上傳到 Storage 
+  const path = `uploads/${file.name}`;
+  const { error: uploadError } = await supabase.storage
+    .from("crm-bucket")
+    .upload(path, file, { upsert: true });
 
-    if (error) {
-      alert("上傳失敗: " + error.message);
-      return;
-    }
-
-    // 呼叫 Supabase Edge Function，而不是 Vercel API
+  if (uploadError) {
+    alert("上傳失敗: " + uploadError.message);
+    setIsProcessing(false);
+    return;
+  }
+    // 2. 觸發 Edge Function
+  try {
+    // 關鍵：使用 fetch 呼叫，但不要 await 它跑完（如果是百萬級別）
+    // 或者讓 Edge Function 支援背景執行
     const res = await fetch(
       "https://htlqcgfgazlmjlyqibik.functions.supabase.co/processExcel",
       {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` 
         },
         body: JSON.stringify({ filename: file.name }),
       }
     );
 
-    const data = await res.json();
-    setFilename(file.name);
-    setTotalRows(data.totalRows || 0);
-    setProcessedRows(data.processedRows || 0);
+    if (res.ok) {
+      alert("檔案已成功提交！後端正在處理百萬筆資料，這可能需要幾分鐘，請稍後刷新頁面。");
+    } else {
+      const errData = await res.json();
+      throw new Error(errData.message || "觸發失敗");
+    }
+  } catch (err: any) {
+    alert("錯誤: " + err.message);
+  } finally {
     setIsProcessing(false);
+  }
   };
 
   return (
