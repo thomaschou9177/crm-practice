@@ -1,67 +1,79 @@
 // src/components/ImportBar.tsx
 "use client";
-import { createClient } from "@supabase/supabase-js";
+import ExcelJS from "exceljs";
 import { useState } from "react";
 import ProgressBar from "./ProgressBar";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 export default function ImportBar() {
   const [file, setFile] = useState<File | null>(null);
-  const [filename, setFilename] = useState<string | null>(null);
   const [totalRows, setTotalRows] = useState<number>(0);
   const [processedRows, setProcessedRows] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // 上傳 Excel 檔案到 Supabase Storage
-  const handleUpload = async () => {
-  if (!file) return;
-  setIsProcessing(true);
+  const handleProcess = async () => {
+    if (!file) return;
+    setIsProcessing(true);
 
-  // 1. 上傳到 Storage 
-  const path = `uploads/${file.name}`;
-  const { error: uploadError } = await supabase.storage
-    .from("crm-bucket")
-    .upload(path, file, { upsert: true });
+    // 1. 前端解析 Excel
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(arrayBuffer);
+    const worksheet = workbook.worksheets[0];
 
-  if (uploadError) {
-    alert("上傳失敗: " + uploadError.message);
-    setIsProcessing(false);
-    return;
-  }
-    // 2. 觸發 Edge Function
-  try {
-    // 關鍵：使用 fetch 呼叫，但不要 await 它跑完（如果是百萬級別）
-    // 或者讓 Edge Function 支援背景執行
-    const res = await fetch(
-      "https://htlqcgfgazlmjlyqibik.functions.supabase.co/processExcel",
-      {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` 
-        },
-        body: JSON.stringify({ filename: file.name }),
+    const totalRows = worksheet.rowCount - 1; // 減去標題列
+    setTotalRows(totalRows);
+
+    const batchSize = 500; // 每批處理 500 筆
+    const totalBatches = Math.ceil(totalRows / batchSize);
+
+    // 建立欄位索引
+    const headerRow = worksheet.getRow(1);
+    const colMap: Record<string, number> = {};
+    headerRow.eachCell((cell, colNumber) => {
+      const val = cell.value ? String(cell.value).toLowerCase().trim() : "";
+      colMap[val] = colNumber;
+    });
+
+    // 2. 分批送 JSON 到 Edge Function
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const startRow = batchIndex * batchSize + 2;
+      const endRow = Math.min(startRow + batchSize - 1, worksheet.rowCount);
+
+      const customers: any[] = [];
+      const infos: any[] = [];
+
+      for (let rowNumber = startRow; rowNumber <= endRow; rowNumber++) {
+        const row = worksheet.getRow(rowNumber);
+        if (!row || row.cellCount === 0) continue;
+
+        const idValue = row.getCell(colMap["id"]).value;
+        if (idValue === null || idValue === undefined) continue;
+
+        const id = Number(idValue);
+        const email = String(row.getCell(colMap["email"]).value || "");
+
+        customers.push({
+          id,
+          name: String(row.getCell(colMap["name"]).value || ""),
+          email,
+          role: String(row.getCell(colMap["role"]).value || ""),
+        });
+
+        infos.push({ id, email });
       }
-    );
-    const data = await res.json();
-    console.log("後端回傳:", data); // 先看這裡印出什麼
-    if (res.ok) {
-      alert("檔案已成功提交！後端正在處理百萬筆資料，這可能需要幾分鐘，請稍後刷新頁面。");
-      setTotalRows(data.totalRows || 0);
-      setProcessedRows(data.totalRows || 0);
-    } else {
-      const errData = await res.json();
-      throw new Error(errData.message || "觸發失敗");
+
+      await fetch("/functions/v1/processExcel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchIndex, customers, infos }),
+      });
+
+      // 更新進度條
+      const processed = Math.min((batchIndex + 1) * batchSize, totalRows);
+      setProcessedRows(processed);
     }
-  } catch (err: any) {
-    alert("錯誤: " + err.message);
-  } finally {
+
     setIsProcessing(false);
-  }
   };
 
   return (
@@ -75,7 +87,7 @@ export default function ImportBar() {
           className="bg-white border p-1 rounded"
         />
         <button
-          onClick={handleUpload}
+          onClick={handleProcess}
           className="bg-green-600 text-white px-4 py-2 rounded font-bold"
           disabled={isProcessing}
         >
@@ -94,3 +106,4 @@ export default function ImportBar() {
     </div>
   );
 }
+
