@@ -62,13 +62,9 @@ export default function ImportBar() {
         infos.push({ id, email });
       }
       // Supabase Function URL 拼接
-      const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(
-        ".co",
-        ".functions.supabase.co"
-      )}/processExcel`;
-      await fetch(functionUrl, {
+      await fetch("https://htlqcgfgazlmjlyqibik.supabase.co/functions/v1/processExcel", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json","Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`, },
         body: JSON.stringify({ batchIndex, customers, infos }),
       });
 
