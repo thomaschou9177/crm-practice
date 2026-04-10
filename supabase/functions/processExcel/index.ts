@@ -11,7 +11,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { filename } = await req.json()
+    const { filename, batchIndex, batchSize } = await req.json()
+    if (!filename) throw new Error("No filename provided")
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' 
@@ -28,10 +30,14 @@ Deno.serve(async (req) => {
     await workbook.xlsx.load(arrayBuffer)
     const worksheet = workbook.worksheets[0]
 
-    const customers = []
-    const infos = []
-    
-    // 找出標題索引 (避免硬編碼欄位順序)
+    // 計算批次範圍
+    const startRow = batchIndex * batchSize + 2 // 跳過標題列
+    const endRow = Math.min(startRow + batchSize - 1, worksheet.rowCount)
+
+    const customers: any[] = []
+    const infos: any[] = []
+
+    // 建立欄位索引
     const headerRow = worksheet.getRow(1)
     const colMap: Record<string, number> = {}
     headerRow.eachCell((cell, colNumber) => {
@@ -39,20 +45,20 @@ Deno.serve(async (req) => {
       colMap[val] = colNumber
     })
 
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return // 跳過標題列
+    for (let rowNumber = startRow; rowNumber <= endRow; rowNumber++) {
+      const row = worksheet.getRow(rowNumber)
+      if (!row || row.cellCount === 0) continue
 
-      // --- 修正重點：確保 id 有被定義 ---
       const idValue = row.getCell(colMap['id']).value
-      if (idValue === null || idValue === undefined) return // 略過沒 ID 的行
+      if (idValue === null || idValue === undefined) continue
 
-      const id = Number(idValue) // 在這裡宣告 id
+      const id = Number(idValue)
       const email = String(row.getCell(colMap['email']).value || "")
 
       customers.push({
-        id: id, // 現在 id 被定義了
+        id,
         name: String(row.getCell(colMap['name']).value || ""),
-        email: email,
+        email,
         role: String(row.getCell(colMap['role']).value || ""),
         metadata: {
           age: row.getCell(colMap['age']).value,
@@ -62,17 +68,21 @@ Deno.serve(async (req) => {
       })
 
       infos.push({ id, email })
-    })
+    }
 
-    // 執行 Upsert (建議分批，如果是 100 萬筆請參考之前的批次邏輯)
-    const { error: err1 } = await supabaseAdmin.from('customer').upsert(customers, { onConflict: 'id' })
-    if (err1) throw err1
+    // 分批 Upsert
+    if (customers.length > 0) {
+      const { error: err1 } = await supabaseAdmin.from('customer').upsert(customers, { onConflict: 'id' })
+      if (err1) throw err1
+    }
 
-    const { error: err2 } = await supabaseAdmin.from('customer_info').upsert(infos, { onConflict: 'id' })
-    if (err2) throw err2
+    if (infos.length > 0) {
+      const { error: err2 } = await supabaseAdmin.from('customer_info').upsert(infos, { onConflict: 'id' })
+      if (err2) throw err2
+    }
 
     return new Response(
-      JSON.stringify({ message: "Success", totalRows: customers.length }),
+      JSON.stringify({ message: "Batch Success", processed: customers.length, batchIndex }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     )
 
