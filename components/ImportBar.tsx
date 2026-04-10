@@ -23,7 +23,7 @@ export default function ImportBar() {
     const totalRows = worksheet.rowCount - 1; // 減去標題列
     setTotalRows(totalRows);
 
-    const batchSize = 500; // 每批處理 500 筆
+    const batchSize = 2000; // 每批處理 2000 筆
     const totalBatches = Math.ceil(totalRows / batchSize);
 
     // 建立欄位索引
