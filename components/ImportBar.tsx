@@ -61,8 +61,12 @@ export default function ImportBar() {
 
         infos.push({ id, email });
       }
-
-      await fetch("/functions/v1/processExcel", {
+      // Supabase Function URL 拼接
+      const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(
+        ".co",
+        ".functions.supabase.co"
+      )}/processExcel`;
+      await fetch(functionUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batchIndex, customers, infos }),
