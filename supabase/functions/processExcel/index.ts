@@ -11,7 +11,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { filename, batchIndex, batchSize } = await req.json()
+    const { filename, batchIndex,  } = await req.json()
+    const batchSize=100;// 固定每批 100 筆
     if (!filename) throw new Error("No filename provided")
 
     const supabaseAdmin = createClient(
@@ -19,15 +20,17 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' 
     )
 
+    // 下載檔案
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from('crm-bucket')
       .download(`uploads/${filename}`)
-
     if (downloadError) throw new Error(`Download error: ${downloadError.message}`)
 
-    const arrayBuffer = await fileData.arrayBuffer()
+    // 使用 streaming parser
     const workbook = new ExcelJS.Workbook()
-    await workbook.xlsx.load(arrayBuffer)
+    const stream = fileData.stream()
+    await workbook.xlsx.read(stream)
+
     const worksheet = workbook.worksheets[0]
 
     // 計算批次範圍
@@ -45,6 +48,7 @@ Deno.serve(async (req) => {
       colMap[val] = colNumber
     })
 
+    // 逐行讀取，只處理需要的範圍
     for (let rowNumber = startRow; rowNumber <= endRow; rowNumber++) {
       const row = worksheet.getRow(rowNumber)
       if (!row || row.cellCount === 0) continue
@@ -60,11 +64,6 @@ Deno.serve(async (req) => {
         name: String(row.getCell(colMap['name']).value || ""),
         email,
         role: String(row.getCell(colMap['role']).value || ""),
-        metadata: {
-          age: row.getCell(colMap['age']).value,
-          birthday: row.getCell(colMap['birthday']).value,
-          education: row.getCell(colMap['education']).value
-        }
       })
 
       infos.push({ id, email })
