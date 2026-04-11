@@ -54,7 +54,7 @@ export default async function DashboardPage(props:{
   const allDynamicKeys: string[] = Array.from(
     new Set(
       allCustomers.flatMap((c: any) =>
-        Object.keys((c.metadata as Record<string, any>) || {})
+        Object.keys((c.metadata as Record<string, any>) || {}).map(k => k.toLowerCase())
       )
     )
   );
@@ -83,15 +83,21 @@ export default async function DashboardPage(props:{
   }
 
   // ✅ 動態 metadata 條件 (自動判斷數字/字串)
-  for (const key of allDynamicKeys) {
+  
+// 動態 metadata keys 統一小寫
+// 查詢條件
+for (const key of allDynamicKeys) {
   const value = params[key];
   if (value && value.trim() !== '') {
-    const normalizedKey = key.toLowerCase(); // 統一小寫
+    const normalizedKey = key.toLowerCase();
     const numVal = Number(value);
 
     if (!isNaN(numVal) && value.trim() === numVal.toString()) {
       customerWhere.AND.push({
-        metadata: { path: [normalizedKey], equals: numVal },
+        OR: [
+          { metadata: { path: [normalizedKey], equals: numVal } },
+          { metadata: { path: [normalizedKey], equals: value } }
+        ]
       });
     } else {
       customerWhere.AND.push({
@@ -100,6 +106,7 @@ export default async function DashboardPage(props:{
     }
   }
 }
+
 
 
   const syncWhere: any = {
