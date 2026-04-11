@@ -31,14 +31,34 @@ import { redirect } from 'next/navigation';
   }
 
   export async function updateMetadataCell(formData: FormData) {
-    const id = Number(formData.get('id'));
-    const key = formData.get('key') as string;
-    const newValue = formData.get('newValue') as string;
-    const record = await prisma.customer.findUnique({ where: { id } });
-    const meta = (record?.metadata as Record<string, any>) || {};
-    await prisma.customer.update({ where: { id }, data: { metadata: { ...meta, [key]: newValue } } });
-    revalidatePath('/dashboard');
+  const id = Number(formData.get('id'));
+  let key = formData.get('key') as string;
+  let newValue: any = formData.get('newValue');
+
+  if (!key) return;
+
+  // ✅ 統一 key → 小寫
+  key = key.toLowerCase();
+
+  // ✅ 嘗試轉成數字，確保型別一致
+  const numVal = Number(newValue);
+  if (!isNaN(numVal) && newValue?.toString().trim() === numVal.toString()) {
+    newValue = numVal; // 存成數字
+  } else {
+    newValue = String(newValue); // 存成字串
   }
+
+  const record = await prisma.customer.findUnique({ where: { id } });
+  const meta = (record?.metadata as Record<string, any>) || {};
+
+  await prisma.customer.update({
+    where: { id },
+    data: { metadata: { ...meta, [key]: newValue } },
+  });
+
+  revalidatePath('/dashboard');
+}
+
 
   export async function addOrUpdateColumn(formData: FormData) {
     const id = Number(formData.get('id'));
