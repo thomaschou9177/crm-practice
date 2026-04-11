@@ -54,9 +54,7 @@ export default async function DashboardPage(props:{
   const allDynamicKeys: string[] = Array.from(
     new Set(
       allCustomers.flatMap((c: any) =>
-        Object.keys((c.metadata as Record<string, any>) || {}).map((k) =>
-          k.toLowerCase()
-        )
+        Object.keys((c.metadata as Record<string, any>) || {})
       )
     )
   );
@@ -89,7 +87,7 @@ export default async function DashboardPage(props:{
     const value = params[key];
     if (value && value.trim() !== '') {
       const numVal = Number(value);
-      if (!isNaN(numVal)) {
+      if (!isNaN(numVal)&& value.trim() === numVal.toString()) {
         // 如果是數字 → 用 equals
         customerWhere.AND.push({
           metadata: { path: [key.toLowerCase()], equals: numVal },
@@ -97,7 +95,7 @@ export default async function DashboardPage(props:{
       } else {
         // 如果是字串 → 用 string_contains
         customerWhere.AND.push({
-          metadata: { path: [key.toLowerCase()], string_contains: value },
+          metadata: { path: [key], string_contains: value },
         });
       }
     }
