@@ -10,8 +10,8 @@ export default function ImportBar() {
   const [processedRows, setProcessedRows] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  const batchSize = 300; // 每批 300 筆
-  const parallelLimit = 2; // 同時送出 2 批
+  const batchSize = 200; // 每批 300 筆
+  const parallelLimit = 1; // 同時送出 2 批
 
   const sendBatch = async (batchIndex: number, customers: any[], infos: any[]) => {
     const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/processExcel`;
