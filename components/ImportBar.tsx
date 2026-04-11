@@ -1,4 +1,3 @@
-// src/components/ImportBar.tsx
 "use client";
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
@@ -11,20 +10,24 @@ export default function ImportBar() {
   const [processedRows, setProcessedRows] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  const batchSize = 500; // 每批 500 筆，避免 payload 過大
-  const parallelLimit = 3; // 同時送出 3 個批次
+  const batchSize = 300; // 每批 300 筆
+  const parallelLimit = 2; // 同時送出 2 批
 
   const sendBatch = async (batchIndex: number, customers: any[], infos: any[]) => {
     const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/processExcel`;
-    await fetch(functionUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({ batchIndex, customers, infos }),
-    });
-    setProcessedRows((prev) => prev + customers.length);
+    try {
+      await fetch(functionUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ batchIndex, customers, infos }),
+      });
+      setProcessedRows((prev) => prev + customers.length);
+    } catch (err) {
+      console.error("Batch upload failed:", err);
+    }
   };
 
   const handleProcess = async () => {
@@ -32,10 +35,62 @@ export default function ImportBar() {
     setIsProcessing(true);
 
     const ext = file.name.split(".").pop()?.toLowerCase();
-    let rows: any[] = [];
+    let buffer: any[] = [];
+    let batchIndex = 0;
+    let activeRequests: Promise<void>[] = [];
+    let total = 0;
 
-    if (ext === "xlsx" || ext === "xls") {
-      // Excel 檔案用 ExcelJS
+    if (ext === "csv") {
+      // ✅ CSV 流式解析
+      await new Promise<void>((resolve, reject) => {
+        Papa.parse(file, {
+          header: true,
+          worker: true,
+          skipEmptyLines: true,
+          chunkSize: 1000,
+          chunk: async (results) => {
+            const data = results.data as any[];
+            for (const record of data) {
+              if (!record.id) continue;
+              buffer.push({
+                id: Number(record.id),
+                name: record.name || "",
+                email: record.email || "",
+                role: record.role || "",
+              });
+              total++;
+            }
+            setTotalRows(total);
+
+            while (buffer.length >= batchSize) {
+              const customers = buffer.slice(0, batchSize);
+              buffer = buffer.slice(batchSize);
+              const infos = customers.map((c) => ({ id: c.id, email: c.email }));
+              const req = sendBatch(batchIndex, customers, infos);
+              activeRequests.push(req);
+              batchIndex++;
+              if (activeRequests.length >= parallelLimit) {
+                await Promise.all(activeRequests);
+                activeRequests = [];
+              }
+            }
+          },
+          complete: async () => {
+            if (buffer.length > 0) {
+              const infos = buffer.map((c) => ({ id: c.id, email: c.email }));
+              await sendBatch(batchIndex, buffer, infos);
+            }
+            if (activeRequests.length > 0) {
+              await Promise.all(activeRequests);
+            }
+            setIsProcessing(false);
+            resolve();
+          },
+          error: (err) => reject(err),
+        });
+      });
+    } else if (ext === "xlsx" || ext === "xls") {
+      // ✅ Excel 解析
       const arrayBuffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
@@ -48,73 +103,22 @@ export default function ImportBar() {
         colMap[val] = colNumber;
       });
 
+      const rows: any[] = [];
       for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
         const row = worksheet.getRow(rowNumber);
         if (!row || row.cellCount === 0) continue;
-
         const idValue = row.getCell(colMap["id"]).value;
         if (idValue === null || idValue === undefined) continue;
-
-        const id = Number(idValue);
-        const email = String(row.getCell(colMap["email"]).value || "");
         rows.push({
-          id,
+          id: Number(idValue),
           name: String(row.getCell(colMap["name"]).value || ""),
-          email,
+          email: String(row.getCell(colMap["email"]).value || ""),
           role: String(row.getCell(colMap["role"]).value || ""),
         });
       }
+
       setTotalRows(rows.length);
-    } else if (ext === "csv") {
-      // CSV 檔案用 PapaParse 流式解析
-      let buffer: any[] = [];
-      let batchIndex = 0;
-      let total = 0;
 
-      await new Promise<void>((resolve, reject) => {
-        Papa.parse(file, {
-          header: true,
-          worker: true,
-          skipEmptyLines: true,
-          step: async (row, parser) => {
-            const record = row.data as any;
-            if (!record.id) return;
-
-            const customer = {
-              id: Number(record.id),
-              name: record.name || "",
-              email: record.email || "",
-              role: record.role || "",
-            };
-            buffer.push(customer);
-            total++;
-
-            if (buffer.length >= batchSize) {
-              const infos = buffer.map((c) => ({ id: c.id, email: c.email }));
-              await sendBatch(batchIndex, buffer, infos);
-              batchIndex++;
-              buffer = [];
-            }
-            setTotalRows(total); // 更新總筆數
-          },
-          complete: async () => {
-            if (buffer.length > 0) {
-              const infos = buffer.map((c) => ({ id: c.id, email: c.email }));
-              await sendBatch(batchIndex, buffer, infos);
-            }
-            resolve();
-          },
-          error: (err) => reject(err),
-        });
-      });
-    } else {
-      alert("Unsupported file type");
-      setIsProcessing(false);
-      return;
-    }
-
-    // Excel 的 rows 分批上傳
-    if (rows.length > 0) {
       const totalBatches = Math.ceil(rows.length / batchSize);
       for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += parallelLimit) {
         const batchPromises: Promise<void>[] = [];
@@ -128,9 +132,12 @@ export default function ImportBar() {
         }
         await Promise.all(batchPromises);
       }
-    }
 
-    setIsProcessing(false);
+      setIsProcessing(false);
+    } else {
+      alert("Unsupported file type");
+      setIsProcessing(false);
+    }
   };
 
   return (
