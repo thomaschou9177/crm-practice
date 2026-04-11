@@ -109,23 +109,40 @@ export default async function DashboardPage(props:{
       syncEmail ? { email: { contains: syncEmail, mode: 'insensitive' } } : {},
     ],
   };
-
+  const filteredPageSize = 50;
+  const currentFilteredPage = Number(params.filteredPage) || 1;
+  const filteredSkip = (currentFilteredPage - 1) * filteredPageSize;
   // --- FILTERED DATA ---
   const filteredCustomers = isCustomerFiltering
     ? await prisma.customer.findMany({
         where: customerWhere,
         include: { customer_info: true },
         orderBy: { id: 'asc' },
+        skip: filteredSkip,
+        take: filteredPageSize,
       })
     : [];
-
+  const filteredTotalCount = isCustomerFiltering
+  ? await prisma.customer.count({ where: customerWhere })
+  : 0;
+  const filteredTotalPages = Math.ceil(filteredTotalCount / filteredPageSize);
+  
+  const filteredSyncPageSize = 50; // 每頁顯示 50 筆
+  const currentFilteredSyncPage = Number(params.filteredSyncPage) || 1;
+  const filteredSyncSkip = (currentFilteredSyncPage - 1) * filteredSyncPageSize;
   const filteredSyncRecords = isSyncFiltering
     ? await prisma.customer_info.findMany({
         where: syncWhere,
         orderBy: { id: 'asc' },
+        skip: filteredSyncSkip,
+        take: filteredSyncPageSize,
       })
     : [];
-
+  // 計算總筆數與總頁數
+  const filteredSyncTotalCount = isSyncFiltering
+    ? await prisma.customer_info.count({ where: syncWhere })
+    : 0;
+  const filteredSyncTotalPages = Math.ceil(filteredSyncTotalCount / filteredSyncPageSize);
   console.log("Full searchParams:", params);
   console.log({
     isCustomerFiltering,
@@ -382,6 +399,9 @@ export default async function DashboardPage(props:{
       <span className="bg-white text-indigo-600 px-2 py-0.5 rounded-full">Results</span>
       Customer Table Search Match ({filteredCustomers.length})
     </h2>
+    <span className="text-xs font-bold">
+        Page {currentFilteredPage} / {filteredTotalPages}
+    </span>
   </div>
   <div className="bg-white shadow-2xl rounded-b-lg overflow-x-auto border-2 border-indigo-600 border-t-0">
     {filteredCustomers.length > 0 ? (
@@ -424,7 +444,20 @@ export default async function DashboardPage(props:{
       </div>
     )}
   </div>
+   {/* 分頁控制區塊 */}
+  <div className="flex justify-center items-center gap-2 mt-4">
+      <a href={`/dashboard?filteredPage=${currentFilteredPage - 1}`} className="px-2 py-1 border rounded">Prev</a>
+      <JumpToPage 
+        totalPages={filteredTotalPages} 
+        currentPage={currentFilteredPage} 
+        paramName="filteredPage" 
+      />
+      <a href={`/dashboard?filteredPage=${currentFilteredPage + 1}`} className="px-2 py-1 border rounded">Next</a>
+  </div>
 </div>
+
+  
+
 
         {/* 2. FILTER FOR customer_info TABLE */}
         <div className="bg-indigo-50 p-4 rounded border border-indigo-100 mb-4">
@@ -477,8 +510,12 @@ export default async function DashboardPage(props:{
                 paramName="syncPage" 
               />
             </div>
+    
 {/* 4. FILTERED RESULTS (SYNC) */}
 <div className="mt-6 animate-in slide-in-from-top-2 duration-300 max-w-md">
+  <span className="text-xs font-bold">
+        Page {currentFilteredSyncPage} / {filteredSyncTotalPages}
+  </span>
   <div className="bg-amber-500 text-white px-4 py-2 rounded-t font-bold uppercase text-[8px] flex justify-between">
     <span>Customer_info Table Search Results</span>
     <span>{filteredSyncRecords.length} Found</span>
@@ -500,6 +537,16 @@ export default async function DashboardPage(props:{
         The sync filter is active, but Prisma found 0 matches in the database.
       </div>
     )}
+  </div>
+  {/* 分頁控制區塊 */}
+  <div className="flex justify-center items-center gap-2 mt-4">
+      <a href={`/dashboard?filteredSyncPage=${currentFilteredSyncPage - 1}`} className="px-2 py-1 border rounded">Prev</a>
+      <JumpToPage 
+        totalPages={filteredSyncTotalPages} 
+        currentPage={currentFilteredSyncPage} 
+        paramName="filteredSyncPage" 
+      />
+      <a href={`/dashboard?filteredSyncPage=${currentFilteredSyncPage + 1}`} className="px-2 py-1 border rounded">Next</a>
   </div>
 </div>
 
