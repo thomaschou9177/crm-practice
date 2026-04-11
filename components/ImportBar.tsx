@@ -14,19 +14,18 @@ export default function ImportBar() {
     if (!file) return;
     setIsProcessing(true);
 
-    // 1. 前端解析 Excel
     const arrayBuffer = await file.arrayBuffer();
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(arrayBuffer);
     const worksheet = workbook.worksheets[0];
 
-    const totalRows = worksheet.rowCount - 1; // 減去標題列
+    const totalRows = worksheet.rowCount - 1;
     setTotalRows(totalRows);
 
-    const batchSize = 2000; // 每批處理 2000 筆
+    const batchSize = 1000; // 每批 1000 筆
+    const parallelLimit = 3; // 同時送出 3 個批次
     const totalBatches = Math.ceil(totalRows / batchSize);
 
-    // 建立欄位索引
     const headerRow = worksheet.getRow(1);
     const colMap: Record<string, number> = {};
     headerRow.eachCell((cell, colNumber) => {
@@ -34,43 +33,56 @@ export default function ImportBar() {
       colMap[val] = colNumber;
     });
 
-    // 2. 分批送 JSON 到 Edge Function
-    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-      const startRow = batchIndex * batchSize + 2;
-      const endRow = Math.min(startRow + batchSize - 1, worksheet.rowCount);
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += parallelLimit) {
+      const batchPromises: Promise<void>[] = [];
 
-      const customers: any[] = [];
-      const infos: any[] = [];
+      for (let j = 0; j < parallelLimit && batchIndex + j < totalBatches; j++) {
+        const currentBatch = batchIndex + j;
+        const startRow = currentBatch * batchSize + 2;
+        const endRow = Math.min(startRow + batchSize - 1, worksheet.rowCount);
 
-      for (let rowNumber = startRow; rowNumber <= endRow; rowNumber++) {
-        const row = worksheet.getRow(rowNumber);
-        if (!row || row.cellCount === 0) continue;
+        const customers: any[] = [];
+        const infos: any[] = [];
 
-        const idValue = row.getCell(colMap["id"]).value;
-        if (idValue === null || idValue === undefined) continue;
+        for (let rowNumber = startRow; rowNumber <= endRow; rowNumber++) {
+          const row = worksheet.getRow(rowNumber);
+          if (!row || row.cellCount === 0) continue;
 
-        const id = Number(idValue);
-        const email = String(row.getCell(colMap["email"]).value || "");
+          const idValue = row.getCell(colMap["id"]).value;
+          if (idValue === null || idValue === undefined) continue;
 
-        customers.push({
-          id,
-          name: String(row.getCell(colMap["name"]).value || ""),
-          email,
-          role: String(row.getCell(colMap["role"]).value || ""),
-        });
+          const id = Number(idValue);
+          const email = String(row.getCell(colMap["email"]).value || "");
 
-        infos.push({ id, email });
+          customers.push({
+            id,
+            name: String(row.getCell(colMap["name"]).value || ""),
+            email,
+            role: String(row.getCell(colMap["role"]).value || ""),
+          });
+
+          infos.push({ id, email });
+        }
+
+        const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/processExcel`;
+
+        batchPromises.push(
+          fetch(functionUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({ batchIndex: currentBatch, customers, infos }),
+          }).then(() => {
+            const processed = Math.min((currentBatch + 1) * batchSize, totalRows);
+            setProcessedRows(processed);
+          })
+        );
       }
-      // Supabase Function URL 拼接
-      await fetch("https://htlqcgfgazlmjlyqibik.supabase.co/functions/v1/processExcel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json","Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`, },
-        body: JSON.stringify({ batchIndex, customers, infos }),
-      });
 
-      // 更新進度條
-      const processed = Math.min((batchIndex + 1) * batchSize, totalRows);
-      setProcessedRows(processed);
+      // 等待這組並行批次完成
+      await Promise.all(batchPromises);
     }
 
     setIsProcessing(false);
@@ -106,4 +118,5 @@ export default function ImportBar() {
     </div>
   );
 }
+
 
