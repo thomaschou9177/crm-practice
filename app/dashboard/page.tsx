@@ -397,7 +397,7 @@ export default async function DashboardPage(props:{
   <div className="bg-indigo-600 text-white p-2 rounded-t-lg flex justify-between items-center border-x-2 border-t-2 border-indigo-600">
     <h2 className="font-bold uppercase text-[9px] flex items-center gap-2">
       <span className="bg-white text-indigo-600 px-2 py-0.5 rounded-full">Results</span>
-      Customer Table Search Match ({filteredCustomers.length})
+      Customer Table Search Match ({filteredTotalCount.length}) 
     </h2>
     <span className="text-xs font-bold">
         Page {currentFilteredPage} / {filteredTotalPages}
@@ -518,7 +518,7 @@ export default async function DashboardPage(props:{
   </span>
   <div className="bg-amber-500 text-white px-4 py-2 rounded-t font-bold uppercase text-[8px] flex justify-between">
     <span>Customer_info Table Search Results</span>
-    <span>{filteredSyncRecords.length} Found</span>
+    <span>{filteredSyncTotalCount.length} Found</span>
   </div>
   <div className="bg-white shadow border-2 border-amber-500 rounded-b overflow-hidden">
     {filteredSyncRecords.length > 0 ? (
