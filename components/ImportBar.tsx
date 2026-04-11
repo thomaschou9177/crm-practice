@@ -11,20 +11,19 @@ export default function ImportBar() {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   const handleProcess = async () => {
-    if (!file) return;
-    setIsProcessing(true);
+  if (!file) return;
+  setIsProcessing(true);
 
+  const ext = file.name.split(".").pop()?.toLowerCase();
+
+  let rows: any[] = [];
+
+  if (ext === "xlsx" || ext === "xls") {
+    // Excel 檔案用 ExcelJS
     const arrayBuffer = await file.arrayBuffer();
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(arrayBuffer);
     const worksheet = workbook.worksheets[0];
-
-    const totalRows = worksheet.rowCount - 1;
-    setTotalRows(totalRows);
-
-    const batchSize = 1000; // 每批 1000 筆
-    const parallelLimit = 3; // 同時送出 3 個批次
-    const totalBatches = Math.ceil(totalRows / batchSize);
 
     const headerRow = worksheet.getRow(1);
     const colMap: Record<string, number> = {};
@@ -33,60 +32,81 @@ export default function ImportBar() {
       colMap[val] = colNumber;
     });
 
-    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += parallelLimit) {
-      const batchPromises: Promise<void>[] = [];
+    for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
+      const row = worksheet.getRow(rowNumber);
+      if (!row || row.cellCount === 0) continue;
+      rows.push({
+        id: Number(row.getCell(colMap["id"]).value),
+        name: String(row.getCell(colMap["name"]).value || ""),
+        email: String(row.getCell(colMap["email"]).value || ""),
+        role: String(row.getCell(colMap["role"]).value || ""),
+      });
+    }
+  } else if (ext === "csv") {
+    // CSV 檔案用 TextDecoder + split
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+    const headers = lines[0].split(",").map(h => h.toLowerCase().trim());
 
-      for (let j = 0; j < parallelLimit && batchIndex + j < totalBatches; j++) {
-        const currentBatch = batchIndex + j;
-        const startRow = currentBatch * batchSize + 2;
-        const endRow = Math.min(startRow + batchSize - 1, worksheet.rowCount);
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(",");
+      const record: any = {};
+      headers.forEach((h, idx) => {
+        record[h] = cols[idx];
+      });
+      rows.push({
+        id: Number(record["id"]),
+        name: record["name"] || "",
+        email: record["email"] || "",
+        role: record["role"] || "",
+      });
+    }
+  } else {
+    alert("Unsupported file type");
+    setIsProcessing(false);
+    return;
+  }
 
-        const customers: any[] = [];
-        const infos: any[] = [];
+  // ✅ 接下來用 rows 做分批上傳
+  setTotalRows(rows.length);
 
-        for (let rowNumber = startRow; rowNumber <= endRow; rowNumber++) {
-          const row = worksheet.getRow(rowNumber);
-          if (!row || row.cellCount === 0) continue;
+  const batchSize = 1000;
+  const parallelLimit = 3;
+  const totalBatches = Math.ceil(rows.length / batchSize);
 
-          const idValue = row.getCell(colMap["id"]).value;
-          if (idValue === null || idValue === undefined) continue;
+  for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += parallelLimit) {
+    const batchPromises: Promise<void>[] = [];
 
-          const id = Number(idValue);
-          const email = String(row.getCell(colMap["email"]).value || "");
+    for (let j = 0; j < parallelLimit && batchIndex + j < totalBatches; j++) {
+      const currentBatch = batchIndex + j;
+      const start = currentBatch * batchSize;
+      const end = Math.min(start + batchSize, rows.length);
 
-          customers.push({
-            id,
-            name: String(row.getCell(colMap["name"]).value || ""),
-            email,
-            role: String(row.getCell(colMap["role"]).value || ""),
-          });
+      const customers = rows.slice(start, end);
+      const infos = customers.map(c => ({ id: c.id, email: c.email }));
 
-          infos.push({ id, email });
-        }
+      const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/processExcel`;
 
-        const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/processExcel`;
-
-        batchPromises.push(
-          fetch(functionUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({ batchIndex: currentBatch, customers, infos }),
-          }).then(() => {
-            const processed = Math.min((currentBatch + 1) * batchSize, totalRows);
-            setProcessedRows(processed);
-          })
-        );
-      }
-
-      // 等待這組並行批次完成
-      await Promise.all(batchPromises);
+      batchPromises.push(
+        fetch(functionUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ batchIndex: currentBatch, customers, infos }),
+        }).then(() => {
+          setProcessedRows(Math.min(end, rows.length));
+        })
+      );
     }
 
-    setIsProcessing(false);
-  };
+    await Promise.all(batchPromises);
+  }
+
+  setIsProcessing(false);
+};
+
 
   return (
     <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-4 flex flex-col gap-2">
