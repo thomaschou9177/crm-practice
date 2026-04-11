@@ -90,7 +90,7 @@ export default async function DashboardPage(props:{
       if (!isNaN(numVal)&& value.trim() === numVal.toString()) {
         // 如果是數字 → 用 equals
         customerWhere.AND.push({
-          metadata: { path: [key.toLowerCase()], equals: numVal },
+          metadata: { path: [key], equals: numVal },
         });
       } else {
         // 如果是字串 → 用 string_contains
