@@ -84,22 +84,23 @@ export default async function DashboardPage(props:{
 
   // ✅ 動態 metadata 條件 (自動判斷數字/字串)
   for (const key of allDynamicKeys) {
-    const value = params[key];
-    if (value && value.trim() !== '') {
-      const numVal = Number(value);
-      if (!isNaN(numVal)&& value.trim() === numVal.toString()) {
-        // 如果是數字 → 用 equals
-        customerWhere.AND.push({
-          metadata: { path: [key], equals: numVal },
-        });
-      } else {
-        // 如果是字串 → 用 string_contains
-        customerWhere.AND.push({
-          metadata: { path: [key], string_contains: value },
-        });
-      }
+  const value = params[key];
+  if (value && value.trim() !== '') {
+    const normalizedKey = key.toLowerCase(); // 統一小寫
+    const numVal = Number(value);
+
+    if (!isNaN(numVal) && value.trim() === numVal.toString()) {
+      customerWhere.AND.push({
+        metadata: { path: [normalizedKey], equals: numVal },
+      });
+    } else {
+      customerWhere.AND.push({
+        metadata: { path: [normalizedKey], equals: value },
+      });
     }
   }
+}
+
 
   const syncWhere: any = {
     AND: [

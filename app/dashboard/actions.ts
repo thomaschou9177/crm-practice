@@ -42,9 +42,18 @@ import { redirect } from 'next/navigation';
 
   export async function addOrUpdateColumn(formData: FormData) {
     const id = Number(formData.get('id'));
-    const colTitle = formData.get('colTitle') as string;
-    const value = formData.get('value') as string;
+    let colTitle = formData.get('colTitle') as string;
+    let value:any = formData.get('value');
     if (!colTitle) return;
+    // ✅ 統一 key → 小寫
+    colTitle = colTitle.toLowerCase();
+    // ✅ 嘗試轉成數字，確保型別一致
+  const numVal = Number(value);
+  if (!isNaN(numVal) && value?.toString().trim() === numVal.toString()) {
+    value = numVal; // 存成數字
+  } else {
+    value = String(value); // 存成字串
+  }
     const record = await prisma.customer.findUnique({ where: { id } });
     const meta = (record?.metadata as Record<string, any>) || {};
     await prisma.customer.update({ where: { id }, data: { metadata: { ...meta, [colTitle]: value } } });
