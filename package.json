@@ -14,6 +14,7 @@
     "bullmq": "^5.73.1",
     "exceljs": "^4.4.0",
     "next": "16.2.0",
+    "papaparse": "^5.5.3",
     "prisma": "^5.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.39",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

@@ -1,43 +1,60 @@
 // supabase/functions/processExcel/index.ts
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")! // 用 Service Role Key，避免 anon key 限制
+);
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+serve(async (req) => {
+  // ✅ CORS 設定
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      },
+    });
+  }
 
   try {
-    const { batchIndex, customers, infos } = await req.json()
+    const { batchIndex, customers, infos } = await req.json();
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' 
-    )
+    // ✅ 批次 upsert，避免單筆 insert 太慢
+    const { error: customerError } = await supabase
+      .from("customer")
+      .upsert(customers, { onConflict: "id" });
 
-    if (customers && customers.length > 0) {
-      const { error: err1 } = await supabaseAdmin.from('customer').upsert(customers, { onConflict: 'id' })
-      if (err1) throw err1
-    }
+    if (customerError) throw customerError;
 
-    if (infos && infos.length > 0) {
-      const { error: err2 } = await supabaseAdmin.from('customer_info').upsert(infos, { onConflict: 'id' })
-      if (err2) throw err2
-    }
+    const { error: infoError } = await supabase
+      .from("customer_info")
+      .upsert(infos, { onConflict: "id" });
+
+    if (infoError) throw infoError;
 
     return new Response(
-      JSON.stringify({ message: "Batch Success", processed: customers?.length || 0, batchIndex }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-    )
-
-  } catch (err: any) {
-    console.error("Error detail:", err.message)
+      JSON.stringify({ success: true, batchIndex }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*", // ✅ 回應也要帶 CORS
+        },
+      }
+    );
+  } catch (err) {
+    console.error("processExcel error:", err);
     return new Response(
-      JSON.stringify({ error: err.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    )
+      JSON.stringify({ success: false, error: String(err) }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
   }
-})
-
+});
