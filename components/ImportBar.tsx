@@ -94,7 +94,7 @@ export default function ImportBar() {
       <div className="flex gap-2">
         <input
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx,.xls,.csv"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
           className="bg-white border p-1 rounded"
         />
