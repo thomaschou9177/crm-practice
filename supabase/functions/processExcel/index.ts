@@ -10,7 +10,7 @@ const corsHeaders = {
 
 // 處理 preflight request
 export async function OPTIONS() {
-  return new Response("ok", { headers: corsHeaders });
+  return new Response("ok", { status: 200,headers: corsHeaders });
 }
 
 export async function POST(req: Request) {

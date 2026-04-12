@@ -1,9 +1,14 @@
-// src/components/ImportBar.tsx
 "use client";
+import { createClient } from "@supabase/supabase-js";
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
 import { useState } from "react";
 import ProgressBar from "./ProgressBar";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function ImportBar() {
   const [file, setFile] = useState<File | null>(null);
@@ -15,19 +20,20 @@ export default function ImportBar() {
   const parallelLimit = 1;
 
   const sendBatch = async (batchIndex: number, customers: any[], infos: any[]) => {
-    const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/processExcel`;
     try {
-      await fetch(functionUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({ batchIndex, customers, infos }),
+      const { data, error } = await supabase.functions.invoke("processExcel", {
+        body: { batchIndex, customers, infos },
       });
-      setProcessedRows((prev) => prev + customers.length);
+
+      if (error) {
+        console.error("Batch upload failed:", error);
+        alert("Batch upload failed, check console logs.");
+      } else {
+        setProcessedRows((prev) => prev + customers.length);
+      }
     } catch (err) {
       console.error("Batch upload failed:", err);
+      alert("Batch upload failed, check console logs.");
     }
   };
 
@@ -41,7 +47,14 @@ export default function ImportBar() {
     if (ext === "csv") {
       const text = await file.text();
       const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-      rows = parsed.data as any[];
+      // 將 header key 全部轉小寫，避免 Age vs age 問題
+      rows = (parsed.data as any[]).map((row) => {
+        const normalized: Record<string, any> = {};
+        Object.keys(row).forEach((key) => {
+          normalized[key.toLowerCase()] = row[key];
+        });
+        return normalized;
+      });
     } else if (ext === "xlsx" || ext === "xls") {
       const arrayBuffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
@@ -132,4 +145,3 @@ export default function ImportBar() {
     </div>
   );
 }
-
