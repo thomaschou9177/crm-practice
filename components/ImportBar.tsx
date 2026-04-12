@@ -17,8 +17,8 @@ export default function ImportBar() {
   const [processedRows, setProcessedRows] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  const batchSize = 200;
-  const parallelLimit = 1;
+  const batchSize = 1000;
+  const parallelLimit = 3;
 
   const sendBatch = async (batchIndex: number, customers: any[], infos: any[]) => {
     try {
