@@ -16,6 +16,7 @@ const TENANT_USERS: Record<string, { username: string; password: string }[]> = {
 };
 
 export default function TenantLoginForm({ tenant }: { tenant: string }) {
+  console.log(tenant);
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
