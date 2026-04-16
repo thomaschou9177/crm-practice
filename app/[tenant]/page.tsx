@@ -21,6 +21,9 @@ const TENANT_USERS: Record<string, { username: string; password: string }[]> = {
 export default function TenantLogin({ params }: { params: { tenant: string } }) {
   const router = useRouter();
   const tenant = params.tenant; // tenant1 或 tenant2
+  console.log("Current tenant:", tenant);
+  console.log("Valid users:", TENANT_USERS[tenant]);
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
