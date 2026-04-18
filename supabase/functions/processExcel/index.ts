@@ -26,14 +26,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 初始化 Supabase (建議開發完後改用 SERVICE_ROLE_KEY 以避開 RLS 限制)
+    
+    
+    // 1. 從請求 Body 中取得 tenant 資訊
+    const { batchIndex, customers, infos,tenant } = await req.json();
+    // 2. 決定要使用的 Schema：如果有傳入 tenant 就用它，否則預設為 'public'
+    const targetSchema = tenant || 'public';
+    // 3. 根據目標 Schema 初始化 Client
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")! 
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { db: { schema: targetSchema } } // 關鍵：動態切換 Schema 
     );
-
-    const { batchIndex, customers, infos } = await req.json();
-
     // 處理資料邏輯...
     const fixedKeys = ["id", "name", "email", "role"];
     const customerPayload = customers.map((c: any) => {
@@ -46,7 +50,7 @@ Deno.serve(async (req) => {
 
     const infoPayload = infos.map((i: any) => ({ id: i.id, email: i.email }));
 
-    // Upsert Customer
+    // Upsert Customer(此時會自動作用於 targetSchema)
     const { error: customerError } = await supabase.from("customer").upsert(customerPayload);
     if (customerError) throw customerError;
 

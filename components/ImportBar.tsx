@@ -2,6 +2,7 @@
 "use client";
 import { createClient } from "@supabase/supabase-js";
 import ExcelJS from "exceljs";
+import { useParams } from "next/navigation"; // 1. 引入 useParams
 import Papa from "papaparse";
 import { useState } from "react";
 import ProgressBar from "./ProgressBar";
@@ -12,6 +13,9 @@ const supabase = createClient(
 );
 
 export default function ImportBar() {
+  const params = useParams(); // 2. 獲取網址參數
+  const tenant = params?.tenant as string; // 取得 tenant1 或 tenant2
+
   const [file, setFile] = useState<File | null>(null);
   const [totalRows, setTotalRows] = useState<number>(0);
   const [processedRows, setProcessedRows] = useState<number>(0);
@@ -23,7 +27,10 @@ export default function ImportBar() {
   const sendBatch = async (batchIndex: number, customers: any[], infos: any[]) => {
     try {
       const { data, error } = await supabase.functions.invoke("processExcel", {
-        body: { batchIndex, customers, infos },
+        body: { batchIndex, 
+                customers, 
+                infos,
+                tenant: tenant || 'public'  },
       });
 
       if (error) {
