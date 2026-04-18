@@ -187,7 +187,7 @@ for (const key of allDynamicKeys) {
     }
     });
     newParams.set(name, value.toString());
-    return `/dashboard?${newParams.toString()}`;
+    return `/${tenant}/dashboard?${newParams.toString()}`;
   };
   
   return (
@@ -374,7 +374,7 @@ for (const key of allDynamicKeys) {
 <div className="flex justify-center items-center gap-2 mt-6 mb-10">
   {/* 第一頁 */}
   <a 
-    href="/dashboard?page=1" 
+    href="/${tenant}/dashboard?page=1" 
     className={`px-3 py-1 border-2 border-slate-800 rounded font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-100 active:translate-y-0.5 ${currentPage === 1 ? 'bg-slate-200 pointer-events-none' : 'bg-white'}`}
   >
     FIRST
@@ -382,7 +382,7 @@ for (const key of allDynamicKeys) {
 
   {/* 上一頁 */}
   <a 
-    href={`/dashboard?page=${currentPage - 1}`} 
+    href={`/${tenant}/dashboard?page=${currentPage - 1}`} 
     className={`px-3 py-1 border-2 border-slate-800 rounded font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-100 ${currentPage <= 1 ? 'opacity-30 pointer-events-none' : 'bg-white'}`}
   >
     PREV
@@ -395,7 +395,7 @@ for (const key of allDynamicKeys) {
 
   {/* 下一頁 */}
   <a 
-    href={`/dashboard?page=${currentPage + 1}`} 
+    href={`/${tenant}/dashboard?page=${currentPage + 1}`} 
     className={`px-3 py-1 border-2 border-slate-800 rounded font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-100 ${currentPage >= totalPages ? 'opacity-30 pointer-events-none' : 'bg-white'}`}
   >
     NEXT
@@ -408,7 +408,7 @@ for (const key of allDynamicKeys) {
 
   {/* 最後一頁 */}
   <a 
-    href={`/dashboard?page=${totalPages}`} 
+    href={`/${tenant}/dashboard?page=${totalPages}`} 
     className={`px-3 py-1 border-2 border-slate-800 rounded font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-100 ${currentPage === totalPages ? 'bg-slate-200 pointer-events-none' : 'bg-white'}`}
   >
     LAST
@@ -473,13 +473,13 @@ for (const key of allDynamicKeys) {
   </div>
    {/* 分頁控制區塊 */}
   <div className="flex justify-center items-center gap-2 mt-4">
-      <a href={`/dashboard?filteredPage=${currentFilteredPage - 1}`} className="px-2 py-1 border rounded">Prev</a>
+      <a href={`/${tenant}/dashboard?filteredPage=${currentFilteredPage - 1}`} className="px-2 py-1 border rounded">Prev</a>
       <JumpToPage 
         totalPages={filteredTotalPages} 
         currentPage={currentFilteredPage} 
         paramName="filteredPage" 
       />
-      <a href={`/dashboard?filteredPage=${currentFilteredPage + 1}`} className="px-2 py-1 border rounded">Next</a>
+      <a href={`/${tenant}/dashboard?filteredPage=${currentFilteredPage + 1}`} className="px-2 py-1 border rounded">Next</a>
   </div>
 </div>
 
@@ -567,13 +567,13 @@ for (const key of allDynamicKeys) {
   </div>
   {/* 分頁控制區塊 */}
   <div className="flex justify-center items-center gap-2 mt-4">
-      <a href={`/dashboard?filteredSyncPage=${currentFilteredSyncPage - 1}`} className="px-2 py-1 border rounded">Prev</a>
+      <a href={`/${tenant}/dashboard?filteredSyncPage=${currentFilteredSyncPage - 1}`} className="px-2 py-1 border rounded">Prev</a>
       <JumpToPage 
         totalPages={filteredSyncTotalPages} 
         currentPage={currentFilteredSyncPage} 
         paramName="filteredSyncPage" 
       />
-      <a href={`/dashboard?filteredSyncPage=${currentFilteredSyncPage + 1}`} className="px-2 py-1 border rounded">Next</a>
+      <a href={`/${tenant}/dashboard?filteredSyncPage=${currentFilteredSyncPage + 1}`} className="px-2 py-1 border rounded">Next</a>
   </div>
 </div>
 
