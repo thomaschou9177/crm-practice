@@ -1,13 +1,14 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { getPrismaClient } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
-  export async function handleLogout() { redirect('/'); }
+  export async function handleLogout(tenant:string) { redirect(`/${tenant}`); }
 
-  export async function addCustomer(formData: FormData) {
+  export async function addCustomer(tenant:string,formData: FormData) {
+    const prisma = getPrismaClient(tenant);
     const id = Number(formData.get('id')); // 從表單或 Excel 取得
     const email = formData.get('email') as string;
     await prisma.customer.create({
@@ -19,18 +20,20 @@ import { redirect } from 'next/navigation';
         customer_info: { create: { email } }
       }
     });
-    revalidatePath('/dashboard');
+    revalidatePath(`/${tenant}/dashboard`);
   }
 
-  export async function updateCoreData(formData: FormData) {
+  export async function updateCoreData(tenant:string,formData: FormData) {
+    const prisma = getPrismaClient(tenant); // 根據傳入的 tenant 取得連線
     const id = Number(formData.get('id'));
     const field = formData.get('field') as string;
     const value = formData.get('value') as string;
     await prisma.customer.update({ where: { id }, data: { [field]: value } });
-    revalidatePath('/dashboard');
+    revalidatePath(`/${tenant}/dashboard`);
   }
 
-  export async function updateMetadataCell(formData: FormData) {
+  export async function updateMetadataCell(tenant:string,formData: FormData) {
+  const prisma = getPrismaClient(tenant); // 根據傳入的 tenant 取得連線
   const id = Number(formData.get('id'));
   let key = formData.get('key') as string;
   let newValue: any = formData.get('newValue');
@@ -56,11 +59,12 @@ import { redirect } from 'next/navigation';
     data: { metadata: { ...meta, [key]: newValue } },
   });
 
-  revalidatePath('/dashboard');
+  revalidatePath(`/${tenant}/dashboard`);
 }
 
 
-  export async function addOrUpdateColumn(formData: FormData) {
+  export async function addOrUpdateColumn(tenant:string,formData: FormData) {
+    const prisma = getPrismaClient(tenant); // 根據傳入的 tenant 取得連線
     const id = Number(formData.get('id'));
     let colTitle = formData.get('colTitle') as string;
     let value:any = formData.get('value');
@@ -77,10 +81,11 @@ import { redirect } from 'next/navigation';
     const record = await prisma.customer.findUnique({ where: { id } });
     const meta = (record?.metadata as Record<string, any>) || {};
     await prisma.customer.update({ where: { id }, data: { metadata: { ...meta, [colTitle]: value } } });
-    revalidatePath('/dashboard');
+    revalidatePath(`/${tenant}/dashboard`);
   }
 
-  export async function deleteWholeColumn(formData: FormData) {
+  export async function deleteWholeColumn(tenant:string,formData: FormData) {
+    const prisma = getPrismaClient(tenant); // 根據傳入的 tenant 取得連線
     const keyToDelete = formData.get('keyToDelete') as string;
     const allRecords = await prisma.customer.findMany();
     for (const r of allRecords) {
@@ -88,23 +93,25 @@ import { redirect } from 'next/navigation';
       delete meta[keyToDelete];
       await prisma.customer.update({ where: { id: r.id }, data: { metadata: meta } });
     }
-    revalidatePath('/dashboard');
+    revalidatePath(`/${tenant}/dashboard`);
   }
 
-  export async function updateSyncEmail(formData: FormData) {
+  export async function updateSyncEmail(tenant:string,formData: FormData) {
+    const prisma = getPrismaClient(tenant); // 根據傳入的 tenant 取得連線
     const infoId = Number(formData.get('infoId'));
     const newEmail = formData.get('newEmail') as string;
     if (!infoId) return;
     await prisma.customer_info.update({ where: { id: infoId }, data: { email: newEmail } });
-    revalidatePath('/dashboard');
+    revalidatePath(`/${tenant}/dashboard`);
   }
 
-  export async function deleteRow(formData: FormData) {
+  export async function deleteRow(tenant:string,formData: FormData) {
+    const prisma = getPrismaClient(tenant); // 根據傳入的 tenant 取得連線
     await prisma.customer.delete({ where: { id: Number(formData.get('id')) } });
-    revalidatePath('/dashboard');
+    revalidatePath(`/${tenant}/dashboard`);
   }
 
-  export async function handleTableSearch(formData: FormData) {
+  export async function handleTableSearch(tenant:string,formData: FormData) {
     // Create a fresh params object to ensure a clean URL
     const params = new URLSearchParams();
     
@@ -114,10 +121,10 @@ import { redirect } from 'next/navigation';
         params.set(key, value.toString());
       }
     });
-    redirect(`/dashboard?${params.toString()}`);
+    redirect(`/${tenant}/dashboard?${params.toString()}`);
   }
 
-  export async function handleSyncSearch(formData: FormData) {
+  export async function handleSyncSearch(tenant:string,formData: FormData) {
     const params = new URLSearchParams();
     // Remove table filters when updating sync filters
     // ['id','name','email','role','age','birthday','education'].forEach(k => params.delete(k));
@@ -127,9 +134,9 @@ import { redirect } from 'next/navigation';
         params.set(key, value.toString());
       }
     });
-    redirect(`/dashboard?${params.toString()}`);
+    redirect(`/${tenant}/dashboard?${params.toString()}`);
   }
 
-  export async function clearFilters() {
-    redirect('/dashboard');
+  export async function clearFilters(tenant:string) {
+    redirect(`/${tenant}/dashboard`);
   }

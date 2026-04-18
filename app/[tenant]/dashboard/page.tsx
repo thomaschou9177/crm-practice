@@ -8,14 +8,34 @@ import { DeleteRowButton } from '@/components/DeleteRowButton';
 import EditableInput from '@/components/EditableInput';
 import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
-import { prisma } from '@/lib/db';
+import { getPrismaClient } from '@/lib/db';
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
 export default async function DashboardPage(props:{
+  params: Promise<{ tenant: string }>; // 獲取 URL 中的 [tenant]
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
  {
+  const { tenant } = await props.params; // 這裡拿到 tenant1 或 tenant2
  // ✅ await 解開 Promise
   const params: Record<string, string | undefined> =await props.searchParams;
+  // 重要：改用對應的 Prisma 客戶端
+  const prisma = getPrismaClient(tenant);
+  // ---------------------------------------------------------
+  // 綁定 Actions：讓 UI 元件呼叫 Action 時自動帶入目前的 tenant
+  // ---------------------------------------------------------
+  const updateCoreDataWithTenant = updateCoreData.bind(null, tenant);
+  const addCustomerWithTenant = addCustomer.bind(null, tenant);
+  const handleTableSearchWithTenant = handleTableSearch.bind(null, tenant);
+  const addOrUpdateColumnWithTenant = addOrUpdateColumn.bind(null, tenant);
+  const clearFiltersWithTenant = clearFilters.bind(null, tenant);
+  const deleteRowWithTenant = deleteRow.bind(null, tenant);
+  const deleteWholeColumnWithTenant = deleteWholeColumn.bind(null, tenant);
+  const handleLogoutWithTenant = handleLogout.bind(null, tenant);
+  const handleSyncSearchWithTenant = handleSyncSearch.bind(null, tenant);
+  const updateMetadataCellWithTenant = updateMetadataCell.bind(null, tenant);
+  const updateSyncEmailWithTenant = updateSyncEmail.bind(null, tenant);
+  
+
   // --- 新增：分頁參數計算 ---
   const pageSize = 50; // 每頁顯示 50 筆
   const currentPage = Number(params.page) || 1;
@@ -177,7 +197,7 @@ for (const key of allDynamicKeys) {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
-          <form action={handleLogout}><button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">Logout</button></form>
+          <form action={handleLogoutWithTenant}><button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">Logout</button></form>
         </div>
 
 {/* IMPORT BAR */}
@@ -215,9 +235,9 @@ for (const key of allDynamicKeys) {
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-bold text-indigo-600 uppercase text-[9px]">Table Filter (Customer Data)</h2>
-            <form action={clearFilters}><button className="text-gray-400 hover:text-red-500 underline text-[8px]">Clear Table Filters</button></form>
+            <form action={clearFiltersWithTenant}><button className="text-gray-400 hover:text-red-500 underline text-[8px]">Clear Table Filters</button></form>
           </div>
-          <form action={handleTableSearch} className="grid grid-cols-8 gap-2">
+          <form action={handleTableSearchWithTenant} className="grid grid-cols-8 gap-2">
             <input name="id" placeholder="ID" className="border p-2 rounded" defaultValue={id} />
             <input name="name" placeholder="Name" className="border p-2 rounded" defaultValue={name} />
             <input name="email" placeholder="Email" className="border p-2 rounded" defaultValue={email} />
@@ -239,7 +259,7 @@ for (const key of allDynamicKeys) {
         {/* ADD ROW BAR */}
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6">
           <h2 className="font-bold mb-3 text-blue-600 uppercase text-[9px]">Add New Customer</h2>
-          <form action={addCustomer} className="flex gap-2">
+          <form action={addCustomerWithTenant} className="flex gap-2">
             <input name="id" placeholder="id" className="border p-2 rounded flex-1 outline-none" required />
             <input name="name" placeholder="Name" className="border p-2 rounded flex-1 outline-none" required />
             <input name="email" placeholder="Email" className="border p-2 rounded flex-1 outline-none" required />
@@ -293,7 +313,7 @@ for (const key of allDynamicKeys) {
                   <th key={key} className="px-4 py-3 border-r border-gray-700 bg-gray-700 text-left">
                     <div className="flex justify-between items-center gap-2">
                       <span>{key}</span>
-                      <form action={deleteWholeColumn}>
+                      <form action={deleteWholeColumnWithTenant}>
                         <input type="hidden" name="keyToDelete" value={key} />
                         <DeleteColumnButton columnName={key} />
                       </form>
@@ -315,7 +335,7 @@ for (const key of allDynamicKeys) {
                             id={c.id}
                             field={field}
                             defaultValue={c[field] || ''}
-                            action={updateCoreData}
+                            action={updateCoreDataWithTenant}
                             className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 focus:outline-none focus:bg-white px-1 py-0.5 rounded transition-all"
                          />
                       </td>
@@ -326,13 +346,13 @@ for (const key of allDynamicKeys) {
                           id={c.id}
                           metadataKey={key}
                           defaultValue={c.metadata?.[key] || ''}
-                          action={updateMetadataCell}
+                          action={updateMetadataCellWithTenant}
                           className="w-full bg-transparent border-b border-transparent focus:border-amber-500 focus:outline-none text-indigo-600"
                         />
                       </td>
                     ))}
                     <td className="p-2 border-r bg-blue-50/30">
-                      <form action={addOrUpdateColumn} className="flex flex-col gap-1">
+                      <form action={addOrUpdateColumnWithTenant} className="flex flex-col gap-1">
                         <input type="hidden" name="id" value={c.id} />
                         <input name="colTitle" placeholder="Col Title" className="border border-blue-200 p-1 rounded bg-white text-[8px] outline-none" />
                         <div className="flex gap-1">
@@ -342,7 +362,7 @@ for (const key of allDynamicKeys) {
                       </form>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <form action={deleteRow}><input type="hidden" name="id" value={c.id} /><DeleteRowButton /></form>
+                      <form action={deleteRowWithTenant}><input type="hidden" name="id" value={c.id} /><DeleteRowButton /></form>
                     </td>
                   </tr>
                 );
@@ -469,7 +489,7 @@ for (const key of allDynamicKeys) {
         {/* 2. FILTER FOR customer_info TABLE */}
         <div className="bg-indigo-50 p-4 rounded border border-indigo-100 mb-4">
           <h2 className="text-[9px] font-bold text-indigo-900 uppercase mb-2">Table Filter (customer_info)</h2>
-          <form action={handleSyncSearch} className="flex gap-2 max-w-2xl">
+          <form action={handleSyncSearchWithTenant} className="flex gap-2 max-w-2xl">
             <input name="syncId" placeholder="Filter Sync ID" className="border p-2 rounded flex-1 bg-white" defaultValue={syncId} />
             <input name="syncEmail" placeholder="Filter Sync Email" className="border p-2 rounded flex-1 bg-white" defaultValue={syncEmail} />
             <button type="submit" className="bg-indigo-900 text-white px-6 rounded font-bold uppercase">Table Search 🔍</button>
@@ -490,7 +510,7 @@ for (const key of allDynamicKeys) {
                 <tr key={`sync-${c.id}`} className="hover:bg-indigo-50/30">
                   <td className="px-4 py-2 font-mono text-gray-400 border-r border-gray-100">{c.id}</td>
                   <td className="p-0">
-                    <form action={updateSyncEmail} className="flex h-full items-center group">
+                    <form action={updateSyncEmailWithTenant} className="flex h-full items-center group">
                       <input type="hidden" name="infoId" value={c.id} />
                       <input 
                         name="newEmail" 
