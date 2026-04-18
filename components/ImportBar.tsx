@@ -2,7 +2,7 @@
 "use client";
 import { createClient } from "@supabase/supabase-js";
 import ExcelJS from "exceljs";
-import { useParams } from "next/navigation"; // 1. 引入 useParams
+import { useParams, useRouter } from "next/navigation"; // 1. 引入 useParams // 1. 引入 useRouter
 import Papa from "papaparse";
 import { useState } from "react";
 import ProgressBar from "./ProgressBar";
@@ -14,6 +14,7 @@ const supabase = createClient(
 
 export default function ImportBar() {
   const params = useParams(); // 2. 獲取網址參數
+  const router = useRouter(); // 2. 初始化 router
   const tenant = params?.tenant as string; // 取得 tenant1 或 tenant2
 
   const [file, setFile] = useState<File | null>(null);
@@ -121,6 +122,13 @@ export default function ImportBar() {
     }
 
     setIsProcessing(false);
+
+    // 3. 關鍵：上傳完成後，通知 Next.js 重新抓取資料
+    // 這會觸發伺服器重新執行 DashboardPage 的 prisma 查詢
+    router.refresh(); 
+    
+    // 選項：如果想給使用者更明確的提示
+    alert("資料上傳並同步完成！");
   };
 
   return (

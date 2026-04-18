@@ -107,8 +107,27 @@ import { redirect } from 'next/navigation';
 
   export async function deleteRow(tenant:string,formData: FormData) {
     const prisma = getPrismaClient(tenant); // 根據傳入的 tenant 取得連線
-    await prisma.customer.delete({ where: { id: Number(formData.get('id')) } });
-    revalidatePath(`/${tenant}/dashboard`);
+    const id = Number(formData.get('id'));
+    if (!id) return;
+
+    try {
+      // 1. 先刪除子表 (customer_info) 中參考此 id 的資料
+      // 因為你的 customer_info PK 通常也是 id，且參考 customer.id
+      await prisma.customer_info.deleteMany({
+        where: { id: id }
+      });
+
+      // 2. 再刪除主表 (customer)
+      await prisma.customer.delete({
+        where: { id: id }
+      });
+
+      // 重新驗證路徑以更新 UI
+      revalidatePath(`/${tenant}/dashboard`);
+    } catch (error) {
+      console.error("Delete failed:", error);
+      // 可以在這裡處理錯誤，例如回傳錯誤訊息給前端
+    }
   }
 
   export async function handleTableSearch(tenant:string,formData: FormData) {
