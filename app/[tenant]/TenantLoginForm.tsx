@@ -34,6 +34,11 @@ export default function TenantLoginForm({ tenant }: { tenant: string }) {
     );
 
     if (user) {
+      // 儲存目前登入的租戶名稱，設定為 1 小時後過期
+      // 建議將 path 設為 / 以便全站 Middleware 讀取
+      document.cookie = `auth_tenant=${tenant}; path=/; max-age=3600; SameSite=Lax`;
+      document.cookie = `isLoggedIn=true; path=/; max-age=3600; SameSite=Lax`;
+
       alert(`登入成功！Tenant: ${tenant}, 使用者: ${user.username}`);
       router.push(`/${tenant}/dashboard`);
     } else {

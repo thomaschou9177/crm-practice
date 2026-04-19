@@ -9,6 +9,8 @@ import EditableInput from '@/components/EditableInput';
 import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
 import { getPrismaClient } from '@/lib/db';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
 export default async function DashboardPage(props:{
   params: Promise<{ tenant: string }>; // 獲取 URL 中的 [tenant]
@@ -16,6 +18,13 @@ export default async function DashboardPage(props:{
  })
  {
   const { tenant } = await props.params; // 這裡拿到 tenant1 或 tenant2
+  const cookieStore = await cookies();
+  const authTenant = cookieStore.get('auth_tenant')?.value;
+
+  // 如果伺服器端發現網址與 Cookie 不符，立即停止渲染
+  if (authTenant !== tenant) {
+    redirect(authTenant ? `/${authTenant}/dashboard` : `/${tenant}`);
+  }
  // ✅ await 解開 Promise
   const params: Record<string, string | undefined> =await props.searchParams;
   // 重要：改用對應的 Prisma 客戶端

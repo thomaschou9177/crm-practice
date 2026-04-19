@@ -5,7 +5,14 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
-  export async function handleLogout(tenant:string) { redirect(`/${tenant}`); }
+  export async function handleLogout(tenant:string) { 
+    // 伺服器端清除 Cookie 的方式
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    cookieStore.delete('auth_tenant');
+    cookieStore.delete('isLoggedIn');
+    redirect(`/${tenant}`); 
+  }
 
   export async function addCustomer(tenant:string,formData: FormData) {
     const prisma = getPrismaClient(tenant);
