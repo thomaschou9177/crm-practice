@@ -125,7 +125,12 @@ import { redirect } from 'next/navigation';
         params.delete(key); // 如果清空輸入框，就移除該參數
       }
     });
-    redirect(`/dashboard?${params.toString()}`);
+    // 取得隱藏欄位中的租戶資訊或從 cookie 判斷
+    // 如果是 public，導向 /dashboard；否則導向 /tenant/dashboard
+    // 這裡建議在 page.tsx 的 form 傳入一個 hidden tenant 欄位
+    const tenant = formData.get("tenant")?.toString() || "public";
+    const basePath = tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard`;
+    redirect(`${basePath}?${params.toString()}`);
   }
 
   export async function handleSyncSearch(formData: FormData) {
@@ -142,7 +147,12 @@ import { redirect } from 'next/navigation';
         params.delete(key); // 如果清空輸入框，就移除該參數
       }
     });
-    redirect(`/dashboard?${params.toString()}`);
+    // 取得隱藏欄位中的租戶資訊或從 cookie 判斷
+    // 如果是 public，導向 /dashboard；否則導向 /tenant/dashboard
+    // 這裡建議在 page.tsx 的 form 傳入一個 hidden tenant 欄位
+    const tenant = formData.get("tenant")?.toString() || "public";
+    const basePath = tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard`;
+    redirect(`${basePath}?${params.toString()}`);
   }
 
   export async function clearFilters() {
