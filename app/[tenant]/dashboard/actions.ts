@@ -138,13 +138,17 @@ import { redirect } from 'next/navigation';
   }
 
   export async function handleTableSearch(tenant:string,formData: FormData) {
+    // 1. 取得目前完整的 URL 參數 (這需要從 formData 裡拿到目前的 searchParams 字串)
+    const currentParamsStr = formData.get("currentSearchParams")?.toString() || "";
     // Create a fresh params object to ensure a clean URL
-    const params = new URLSearchParams();
-    
-    // Only add fields that have an actual value
+    const params = new URLSearchParams(currentParamsStr);
+    // 2. 更新或設定 Customer 相關的過濾條件
     formData.forEach((value, key) => {
+      if (key === "currentSearchParams") return; // 跳過隱藏欄位本身
       if (value && value.toString().trim() !== "") {
         params.set(key, value.toString());
+      }else{
+        params.delete(key); // 如果清空輸入框，就移除該參數
       }
     });
     redirect(`/${tenant}/dashboard?${params.toString()}`);

@@ -247,6 +247,8 @@ for (const key of allDynamicKeys) {
             <form action={clearFiltersWithTenant}><button className="text-gray-400 hover:text-red-500 underline text-[8px]">Clear Table Filters</button></form>
           </div>
           <form action={handleTableSearchWithTenant} className="grid grid-cols-8 gap-2">
+            {/* 關鍵：把目前的 params 轉成字串傳給後端 */}
+            <input type="hidden" name="currentSearchParams" value={new URLSearchParams(params as any).toString()} />
             <input name="id" placeholder="ID" className="border p-2 rounded" defaultValue={id} />
             <input name="name" placeholder="Name" className="border p-2 rounded" defaultValue={name} />
             <input name="email" placeholder="Email" className="border p-2 rounded" defaultValue={email} />
@@ -499,6 +501,8 @@ for (const key of allDynamicKeys) {
         <div className="bg-indigo-50 p-4 rounded border border-indigo-100 mb-4">
           <h2 className="text-[9px] font-bold text-indigo-900 uppercase mb-2">Table Filter (customer_info)</h2>
           <form action={handleSyncSearchWithTenant} className="flex gap-2 max-w-2xl">
+            {/* 關鍵：把目前的 params 轉成字串傳給後端 */}
+            <input type="hidden" name="currentSearchParams" value={new URLSearchParams(params as any).toString()} />
             <input name="syncId" placeholder="Filter Sync ID" className="border p-2 rounded flex-1 bg-white" defaultValue={syncId} />
             <input name="syncEmail" placeholder="Filter Sync Email" className="border p-2 rounded flex-1 bg-white" defaultValue={syncEmail} />
             <button type="submit" className="bg-indigo-900 text-white px-6 rounded font-bold uppercase">Table Search 🔍</button>
