@@ -155,13 +155,17 @@ import { redirect } from 'next/navigation';
   }
 
   export async function handleSyncSearch(tenant:string,formData: FormData) {
-    const params = new URLSearchParams();
-    // Remove table filters when updating sync filters
-    // ['id','name','email','role','age','birthday','education'].forEach(k => params.delete(k));
-    // Only add fields that have an actual value
+    // 1. 這裡也要改成讀取 currentSearchParams，否則會清空 customer 表格的搜尋結果
+    const currentParamsStr = formData.get("currentSearchParams")?.toString() || "";
+    const params = new URLSearchParams(currentParamsStr);
+    
+    
     formData.forEach((value, key) => {
+      if (key === "currentSearchParams") return;
       if (value && value.toString().trim() !== "") {
         params.set(key, value.toString());
+      }else {
+      params.delete(key);
       }
     });
     redirect(`/${tenant}/dashboard?${params.toString()}`);
