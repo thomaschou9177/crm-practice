@@ -1,6 +1,6 @@
+// app/dashboard/page.tsx
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
 import DeleteAllDataButton from '@/components/DeleteAllDataButton';
 import { DeleteColumnButton } from '@/components/DeleteColumnButton';
 import { DeleteRowButton } from '@/components/DeleteRowButton';
@@ -8,12 +8,23 @@ import EditableInput from '@/components/EditableInput';
 import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
 import { prisma } from '@/lib/db';
+import { cookies } from 'next/headers'; // 1. 引入 cookies
+import { redirect } from 'next/navigation'; // 2. 引入 redirect
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
 export default async function DashboardPage(props:{
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
  {
- // ✅ await 解開 Promise
+  // 3. 權限檢查邏輯
+  const cookieStore = await cookies();
+  const isLoggedIn = cookieStore.get('isLoggedIn')?.value;
+  const authTenant = cookieStore.get('auth_tenant')?.value;
+
+  // 如果沒登入，或是登入的不是 public，強制踢回根目錄 /
+  if (!isLoggedIn || authTenant !== 'public') {
+    redirect('/');
+  }
+  // ✅ await 解開 Promise
   const params: Record<string, string | undefined> =await props.searchParams;
   // --- 新增：分頁參數計算 ---
   const pageSize = 50; // 每頁顯示 50 筆
@@ -176,7 +187,7 @@ for (const key of allDynamicKeys) {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
-          <form action={handleLogout}><button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">Logout</button></form>
+          <form action={() => handleLogout('public')}><button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">Logout</button></form>
         </div>
 
 {/* IMPORT BAR */}

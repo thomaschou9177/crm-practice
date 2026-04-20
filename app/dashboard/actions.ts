@@ -1,11 +1,18 @@
 'use server';
-
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
-  export async function handleLogout() { redirect('/'); }
+  export async function handleLogout(tenant:string) { 
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    cookieStore.delete('auth_tenant');
+    cookieStore.delete('isLoggedIn');
+    // 如果是 public，導向 /；如果是租戶，導向 /tenant1
+    const redirectPath = tenant === 'public' ? '/' : `/${tenant}`;
+    redirect(redirectPath); 
+  }
 
   export async function addCustomer(formData: FormData) {
     const id = Number(formData.get('id')); // 從表單或 Excel 取得
