@@ -1,3 +1,4 @@
+// app/dashboard/actions.ts
 'use server';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
@@ -118,7 +119,7 @@ import { redirect } from 'next/navigation';
     
     // Only add fields that have an actual value
     formData.forEach((value, key) => {
-      if (key === "currentSearchParams") return; // 跳過隱藏欄位本身
+      if (key === "currentSearchParams" || key === "tenant") return; // 跳過隱藏欄位本身
       if (value && value.toString().trim() !== "") {
         params.set(key, value.toString());
       }else{
@@ -140,7 +141,7 @@ import { redirect } from 'next/navigation';
     
     // Only add fields that have an actual value
     formData.forEach((value, key) => {
-      if (key === "currentSearchParams") return; // 跳過隱藏欄位本身
+      if (key === "currentSearchParams" || key === "tenant") return; // 跳過隱藏欄位本身
       if (value && value.toString().trim() !== "") {
         params.set(key, value.toString());
       }else{

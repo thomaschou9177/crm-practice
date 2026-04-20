@@ -17,11 +17,15 @@ export default async function DashboardPage(props:{
  {
   // 3. 權限檢查邏輯
   const cookieStore = await cookies();
-  const isLoggedIn = cookieStore.get('isLoggedIn')?.value;
+  const isLoggedIn = cookieStore.get('isLoggedIn')?.value==='true';
   const authTenant = cookieStore.get('auth_tenant')?.value;
 
-  // 如果沒登入，或是登入的不是 public，強制踢回根目錄 /
+  // 1. 權限檢查邏輯：確保只有 public 租戶能進來
   if (!isLoggedIn || authTenant !== 'public') {
+    // 如果已經登入但租戶不是 public，應該去他自己的 dashboard 而不是首頁
+    if (isLoggedIn && authTenant) {
+      redirect(`/${authTenant}/dashboard`);
+    }
     redirect('/');
   }
   // ✅ await 解開 Promise
