@@ -16,7 +16,7 @@ export function middleware(request: NextRequest) {
   const pathSegments = pathname.split('/');
   // 網址 /dashboard/... -> target 為 'public'
   // 網址 /tenant1/dashboard -> target 為 'tenant1'
-  let targetTenant = pathSegments[1];
+  let targetTenant = pathSegments[1]|| 'public';
   if (targetTenant === 'dashboard') targetTenant = 'public';
 
   const isLoginPage = pathname === '/' || pathname === '/tenant1' || pathname === '/tenant2';
