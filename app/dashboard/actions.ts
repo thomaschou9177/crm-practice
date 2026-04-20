@@ -105,26 +105,34 @@ import { redirect } from 'next/navigation';
   }
 
   export async function handleTableSearch(formData: FormData) {
-    // Create a fresh params object to ensure a clean URL
-    const params = new URLSearchParams();
+    // 1. 取得目前完整的 URL 參數 (這需要從 formData 裡拿到目前的 searchParams 字串)
+    const currentParamsStr = formData.get("currentSearchParams")?.toString() || "";
+    const params = new URLSearchParams(currentParamsStr);
     
     // Only add fields that have an actual value
     formData.forEach((value, key) => {
+      if (key === "currentSearchParams") return; // 跳過隱藏欄位本身
       if (value && value.toString().trim() !== "") {
         params.set(key, value.toString());
+      }else{
+        params.delete(key); // 如果清空輸入框，就移除該參數
       }
     });
     redirect(`/dashboard?${params.toString()}`);
   }
 
   export async function handleSyncSearch(formData: FormData) {
-    const params = new URLSearchParams();
-    // Remove table filters when updating sync filters
-    // ['id','name','email','role','age','birthday','education'].forEach(k => params.delete(k));
+    // 1. 取得目前完整的 URL 參數 (這需要從 formData 裡拿到目前的 searchParams 字串)
+    const currentParamsStr = formData.get("currentSearchParams")?.toString() || "";
+    const params = new URLSearchParams(currentParamsStr);
+    
     // Only add fields that have an actual value
     formData.forEach((value, key) => {
+      if (key === "currentSearchParams") return; // 跳過隱藏欄位本身
       if (value && value.toString().trim() !== "") {
         params.set(key, value.toString());
+      }else{
+        params.delete(key); // 如果清空輸入框，就移除該參數
       }
     });
     redirect(`/dashboard?${params.toString()}`);
