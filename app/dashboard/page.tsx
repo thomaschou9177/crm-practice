@@ -7,6 +7,7 @@ import { DeleteRowButton } from '@/components/DeleteRowButton';
 import EditableInput from '@/components/EditableInput';
 import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
+import TenantGuard from '@/components/TenantGuard';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers'; // 1. 引入 cookies
 import { redirect } from 'next/navigation'; // 2. 引入 redirect
@@ -20,13 +21,13 @@ export default async function DashboardPage(props:{
   const isLoggedIn = cookieStore.get('isLoggedIn')?.value==='true';
   const authTenant = cookieStore.get('auth_tenant')?.value;
 
-  // 1. 權限檢查邏輯：確保只有 public 租戶能進來
-  if (!isLoggedIn || authTenant !== 'public') {
-    // 如果已經登入但租戶不是 public，應該去他自己的 dashboard 而不是首頁
-    if (isLoggedIn && authTenant) {
-      redirect(`/${authTenant}/dashboard`);
-    }
+  // 如果沒登入，或是登入的不是 public，強制踢回根目錄 /
+  if (!isLoggedIn || !authTenant) {
     redirect('/');
+  }
+  // 如果登入租戶不是 'public'，導向到該租戶正確的 dashboard
+  if (authTenant !== 'public') {
+    redirect(`/${authTenant}/dashboard`);
   }
   // ✅ await 解開 Promise
   const params: Record<string, string | undefined> =await props.searchParams;
@@ -187,7 +188,8 @@ for (const key of allDynamicKeys) {
   return (
     <div className="p-8 bg-gray-50 min-h-screen text-black text-[10px]">
       <div className="max-w-[98%] mx-auto">
-        
+        {/* 放入 TenantGuard，它會監控 URL 參數 */}
+        <TenantGuard currentTenant="public" />
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
