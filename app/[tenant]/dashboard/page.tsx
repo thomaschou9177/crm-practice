@@ -8,6 +8,7 @@ import { DeleteRowButton } from '@/components/DeleteRowButton';
 import EditableInput from '@/components/EditableInput';
 import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
+import TenantGuard from '@/components/TenantGuard';
 import { getPrismaClient } from '@/lib/db';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -202,7 +203,7 @@ for (const key of allDynamicKeys) {
   return (
     <div className="p-8 bg-gray-50 min-h-screen text-black text-[10px]">
       <div className="max-w-[98%] mx-auto">
-        
+        <TenantGuard currentTenant={tenant} />
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
