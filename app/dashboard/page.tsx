@@ -10,7 +10,7 @@ import JumpToPage from '@/components/JumpToPage';
 import TenantGuard from '@/components/TenantGuard';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers'; // 1. 引入 cookies
-import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
+import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateSyncEmail } from './actions';
 export default async function DashboardPage(props:{
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
@@ -18,7 +18,7 @@ export default async function DashboardPage(props:{
   // 3. 權限檢查邏輯
   const cookieStore = await cookies();
   const isLoggedIn = cookieStore.get('isLoggedIn')?.value==='true';
-  const authTenant = cookieStore.get('auth_tenant')?.value;
+  const authTenant = cookieStore.get('auth_tenant')?.value|| 'public';
 
   // 如果沒登入，或是登入的不是 public，強制踢回根目錄 /
 
@@ -334,11 +334,11 @@ for (const key of allDynamicKeys) {
                     {['name', 'email', 'role'].map((field) => (
                       <td key={field} className="p-0 border-r">
                         <EditableInput
-                            id={c.id}
-                            field={field}
-                            defaultValue={c[field] || ''}
-                            action={updateCoreData}
-                            className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 focus:outline-none focus:bg-white px-1 py-0.5 rounded transition-all"
+                          id={c.id}
+                          field="name"
+                          defaultValue={c.name || ''}
+                          tenant={authTenant}
+                          className="w-full bg-transparent border-b border-transparent focus:border-indigo-500"
                          />
                       </td>
                     ))}
@@ -348,8 +348,8 @@ for (const key of allDynamicKeys) {
                           id={c.id}
                           metadataKey={key}
                           defaultValue={c.metadata?.[key] || ''}
-                          action={updateMetadataCell}
-                          className="w-full bg-transparent border-b border-transparent focus:border-amber-500 focus:outline-none text-indigo-600"
+                          tenant={authTenant}
+                          className="w-full bg-transparent border-b border-transparent focus:border-amber-500 text-indigo-600"
                         />
                       </td>
                     ))}
