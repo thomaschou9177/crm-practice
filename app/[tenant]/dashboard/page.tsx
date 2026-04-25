@@ -39,7 +39,7 @@ export default async function DashboardPage(props:{
   const clearFiltersWithTenant = clearFilters.bind(null, tenant);
   const deleteRowWithTenant = deleteRow.bind(null, tenant);
   const deleteWholeColumnWithTenant = deleteWholeColumn.bind(null, tenant);
-  const handleLogoutWithTenant = handleLogout.bind(null, tenant);
+  // const handleLogoutWithTenant = handleLogout.bind(null, tenant);
   const handleSyncSearchWithTenant = handleSyncSearch.bind(null, tenant);
   const updateMetadataCellWithTenant = updateMetadataCell.bind(null, tenant);
   const updateSyncEmailWithTenant = updateSyncEmail.bind(null, tenant);
@@ -206,7 +206,12 @@ for (const key of allDynamicKeys) {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
-          <form action={handleLogoutWithTenant}><button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">Logout</button></form>
+          <form action={handleLogout}>
+            <input type="hidden" name="tenant" value={tenant} />
+            <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">
+              Logout
+            </button>
+          </form>
         </div>
 
 {/* IMPORT BAR */}
