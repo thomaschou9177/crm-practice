@@ -10,7 +10,6 @@ import JumpToPage from '@/components/JumpToPage';
 import TenantGuard from '@/components/TenantGuard';
 import { prisma } from '@/lib/db';
 import { cookies } from 'next/headers'; // 1. 引入 cookies
-import { redirect } from 'next/navigation'; // 2. 引入 redirect
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
 export default async function DashboardPage(props:{
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
@@ -22,13 +21,17 @@ export default async function DashboardPage(props:{
   const authTenant = cookieStore.get('auth_tenant')?.value;
 
   // 如果沒登入，或是登入的不是 public，強制踢回根目錄 /
-  if (!isLoggedIn || !authTenant) {
-    redirect('/');
-  }
+
+  // if (!isLoggedIn || !authTenant) {
+  //   redirect('/');
+  // }
+
   // 如果登入租戶不是 'public'，導向到該租戶正確的 dashboard
-  if (authTenant !== 'public') {
-    redirect(`/${authTenant}/dashboard`);
-  }
+
+  // if (authTenant !== 'public') {
+  //   redirect(`/${authTenant}/dashboard`);
+  // }
+
   // ✅ await 解開 Promise
   const params: Record<string, string | undefined> =await props.searchParams;
   // --- 新增：分頁參數計算 ---

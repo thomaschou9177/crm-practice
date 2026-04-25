@@ -11,7 +11,6 @@ import JumpToPage from '@/components/JumpToPage';
 import TenantGuard from '@/components/TenantGuard';
 import { getPrismaClient } from '@/lib/db';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
 export default async function DashboardPage(props:{
   params: Promise<{ tenant: string }>; // 獲取 URL 中的 [tenant]
@@ -23,9 +22,9 @@ export default async function DashboardPage(props:{
   const authTenant = cookieStore.get('auth_tenant')?.value;
 
   // 如果伺服器端發現網址與 Cookie 不符，立即停止渲染
-  if (authTenant !== tenant) {
-    redirect(authTenant ? `/${authTenant}/dashboard` : `/${tenant}`);
-  }
+  // if (authTenant !== tenant) {
+  //   redirect(authTenant ? `/${authTenant}/dashboard` : `/${tenant}`);
+  // }
  // ✅ await 解開 Promise
   const params: Record<string, string | undefined> =await props.searchParams;
   // 重要：改用對應的 Prisma 客戶端
