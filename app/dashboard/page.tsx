@@ -197,7 +197,7 @@ for (const key of allDynamicKeys) {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
           <form action={handleLogout}>
-            <input type="hidden" name="tenant" value={authTenant} />
+            <input type="hidden" name="tenant" value="public" />
             <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">
               Logout
             </button>
