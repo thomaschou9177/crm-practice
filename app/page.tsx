@@ -2,7 +2,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation'; // Import the router
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { loginPublic } from './dashboard/actions';
 
 const translations = {
@@ -52,24 +52,24 @@ export default function Home() {
   const [error, setError] = useState('');
 
   const t = translations[lang];
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  // const handleSubmit = (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setError('');
 
-    // Check if the input matches any of our 3 sets
-    const user = VALID_USERS.find(
-      (u) => u.username === username && u.password === password
-    );
+  //   // Check if the input matches any of our 3 sets
+  //   const user = VALID_USERS.find(
+  //     (u) => u.username === username && u.password === password
+  //   );
 
-    if (user) {
-      alert(`${t.success}${user.username}`);
-      router.push('/dashboard')
-      // In a real app, you would use 'next/navigation' to redirect here
-      // router.push('/dashboard'); 
-    } else {
-      setError(t.error);
-    }
-  };
+  //   if (user) {
+  //     alert(`${t.success}${user.username}`);
+  //     router.push('/dashboard')
+  //     // In a real app, you would use 'next/navigation' to redirect here
+  //     // router.push('/dashboard'); 
+  //   } else {
+  //     setError(t.error);
+  //   }
+  // };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-6">
