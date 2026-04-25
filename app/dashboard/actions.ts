@@ -27,11 +27,16 @@ import { redirect } from 'next/navigation';
         redirect(`/${targetTenant}`);
       }
     }
+    // ✅ 新規則：即使 tenant === targetTenant，也要登出並停在該登入頁
+    if (tenant === 'public') {
+      redirect('/');
+    } else {
+      redirect(`/${tenant}`);
+    }
 
-
-    // 如果是 public，導向 /；如果是租戶，導向 /tenant1
-    const redirectPath = tenant === 'public' ? '/' : `/${tenant}`;
-    redirect(redirectPath); 
+    // // 如果是 public，導向 /；如果是租戶，導向 /tenant1
+    // const redirectPath = tenant === 'public' ? '/' : `/${tenant}`;
+    // redirect(redirectPath); 
   }
 
   export async function addCustomer(formData: FormData) {

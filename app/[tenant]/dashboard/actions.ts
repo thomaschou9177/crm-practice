@@ -23,9 +23,15 @@ import { redirect } from 'next/navigation';
       redirect(`/${targetTenant}`);
     }
   }
+  // ✅ 新規則：即使 tenant === targetTenant，也要登出並停在該登入頁
+  if (tenant === 'public') {
+    redirect('/');
+  } else {
+    redirect(`/${tenant}`);
+  }
 
-  // 原本邏輯
-  redirect(tenant === 'public' ? '/' : `/${tenant}`);
+  // // 原本邏輯
+  // redirect(tenant === 'public' ? '/' : `/${tenant}`);
 }
 
   export async function addCustomer(tenant:string,formData: FormData) {

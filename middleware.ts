@@ -46,6 +46,15 @@ export function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
     }
   }
+  // --- 新增規則：同租戶登入頁或 dashboard 也要強制登出 ---
+  if ((isLoginPage || isDashboardArea) && isLoggedIn && authTenant && authTenant === targetTenant) {
+    const response = NextResponse.redirect(
+      targetTenant === 'public' ? new URL('/', request.url) : new URL(`/${targetTenant}`, request.url)
+    );
+    response.cookies.delete('auth_tenant');
+    response.cookies.delete('isLoggedIn');
+    return response;
+  }
 
   return NextResponse.next();
 }
