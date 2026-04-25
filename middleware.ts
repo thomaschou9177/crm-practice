@@ -20,24 +20,21 @@ export function middleware(request: NextRequest) {
   const isLoginPage = pathname === '/' || pathname === '/tenant1' || pathname === '/tenant2';
   const isDashboardArea = pathname === '/dashboard' || pathname.includes('/dashboard');
 
-  // --- 規則 1：同租戶登入頁也要強制登出 ---
-  if (isLoginPage && isLoggedIn && authTenant && authTenant === targetTenant) {
-    const response = NextResponse.redirect(
-      targetTenant === 'public' ? new URL('/', request.url) : new URL(`/${targetTenant}`, request.url)
-    );
-    response.cookies.delete('auth_tenant');
-    response.cookies.delete('isLoggedIn');
-    return response;
+  // --- 規則：跨租戶或同租戶登入頁/dashboard → 交給 TenantGuard ---
+  if ((isLoginPage || isDashboardArea) && isLoggedIn && authTenant && authTenant !== targetTenant) {
+    const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
+    const url = new URL(currentDash, request.url);
+    url.searchParams.set('pending_switch', pathname);
+    url.searchParams.set('target_tenant', targetTenant);
+    return NextResponse.redirect(url);
   }
 
-  // --- 規則 2：跨租戶切換也要強制登出 ---
-  if ((isLoginPage || isDashboardArea) && isLoggedIn && authTenant && authTenant !== targetTenant) {
-    const response = NextResponse.redirect(
-      targetTenant === 'public' ? new URL('/', request.url) : new URL(`/${targetTenant}`, request.url)
-    );
-    response.cookies.delete('auth_tenant');
-    response.cookies.delete('isLoggedIn');
-    return response;
+  if ((isLoginPage || isDashboardArea) && isLoggedIn && authTenant && authTenant === targetTenant) {
+    const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
+    const url = new URL(currentDash, request.url);
+    url.searchParams.set('pending_switch', pathname);
+    url.searchParams.set('target_tenant', targetTenant);
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();

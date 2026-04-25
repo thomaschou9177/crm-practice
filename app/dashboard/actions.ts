@@ -6,38 +6,26 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
-  export async function handleLogout(formData:FormData) { 
-    // const { cookies } = await import('next/headers');
-    const tenant = formData.get('tenant')?.toString() || 'public';
-    const targetTenant = formData.get('target_tenant')?.toString();
-    const cookieStore = await cookies();
-    cookieStore.delete('auth_tenant');
-    cookieStore.delete('isLoggedIn');
+  export async function handleLogout(formData: FormData) {
+  const tenant = formData.get('tenant')?.toString() || 'public';
+  const targetTenant = formData.get('target_tenant')?.toString();
 
-    // // ✅ 如果有 targetTenant，優先導向它的登入頁
-    // if (targetTenant && targetTenant !== 'public') {
-    //   redirect(`/${targetTenant}`);
-    // }
+  const cookieStore = await cookies();
+  cookieStore.delete('auth_tenant');
+  cookieStore.delete('isLoggedIn');
 
-    // ✅ 如果有 targetTenant，優先導向它的登入頁
-    if (targetTenant) {
-      if (targetTenant === 'public') {
-        redirect('/');
-      } else {
-        redirect(`/${targetTenant}`);
-      }
-    }
-    // ✅ 新規則：即使 tenant === targetTenant，也要登出並停在該登入頁
-    if (tenant === 'public') {
+  // ✅ TenantGuard 會傳 targetTenant，優先導向它
+  if (targetTenant) {
+    if (targetTenant === 'public') {
       redirect('/');
     } else {
-      redirect(`/${tenant}`);
+      redirect(`/${targetTenant}`);
     }
-
-    // // 如果是 public，導向 /；如果是租戶，導向 /tenant1
-    // const redirectPath = tenant === 'public' ? '/' : `/${tenant}`;
-    // redirect(redirectPath); 
   }
+
+  // fallback：沒有 targetTenant 時，依 tenant 判斷
+  redirect(tenant === 'public' ? '/' : `/${tenant}`);
+}
 
   export async function addCustomer(formData: FormData) {
     const id = Number(formData.get('id')); // 從表單或 Excel 取得

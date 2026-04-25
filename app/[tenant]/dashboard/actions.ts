@@ -15,7 +15,7 @@ import { redirect } from 'next/navigation';
   cookieStore.delete('auth_tenant');
   cookieStore.delete('isLoggedIn');
 
-  // ✅ 如果有 targetTenant，優先導向它的登入頁
+  // ✅ TenantGuard 會傳 targetTenant，優先導向它
   if (targetTenant) {
     if (targetTenant === 'public') {
       redirect('/');
@@ -23,15 +23,9 @@ import { redirect } from 'next/navigation';
       redirect(`/${targetTenant}`);
     }
   }
-  // ✅ 新規則：即使 tenant === targetTenant，也要登出並停在該登入頁
-  if (tenant === 'public') {
-    redirect('/');
-  } else {
-    redirect(`/${tenant}`);
-  }
 
-  // // 原本邏輯
-  // redirect(tenant === 'public' ? '/' : `/${tenant}`);
+  // fallback：沒有 targetTenant 時，依 tenant 判斷
+  redirect(tenant === 'public' ? '/' : `/${tenant}`);
 }
 
   export async function addCustomer(tenant:string,formData: FormData) {
