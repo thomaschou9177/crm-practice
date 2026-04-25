@@ -7,16 +7,28 @@ import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
   export async function handleLogout(formData:FormData) { 
-    const { cookies } = await import('next/headers');
+    // const { cookies } = await import('next/headers');
     const tenant = formData.get('tenant')?.toString() || 'public';
     const targetTenant = formData.get('target_tenant')?.toString();
     const cookieStore = await cookies();
     cookieStore.delete('auth_tenant');
     cookieStore.delete('isLoggedIn');
+
+    // // ✅ 如果有 targetTenant，優先導向它的登入頁
+    // if (targetTenant && targetTenant !== 'public') {
+    //   redirect(`/${targetTenant}`);
+    // }
+
     // ✅ 如果有 targetTenant，優先導向它的登入頁
-    if (targetTenant && targetTenant !== 'public') {
-      redirect(`/${targetTenant}`);
+    if (targetTenant) {
+      if (targetTenant === 'public') {
+        redirect('/');
+      } else {
+        redirect(`/${targetTenant}`);
+      }
     }
+
+
     // 如果是 public，導向 /；如果是租戶，導向 /tenant1
     const redirectPath = tenant === 'public' ? '/' : `/${tenant}`;
     redirect(redirectPath); 
