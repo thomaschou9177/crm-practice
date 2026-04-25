@@ -1,3 +1,4 @@
+// app/[tenant]/dashboard/actions.ts
 'use server';
 
 import { getPrismaClient } from '@/lib/db';

@@ -3,6 +3,7 @@
 
 import { useRouter } from 'next/navigation'; // Import the router
 import React, { useState } from 'react';
+import { loginPublic } from './dashboard/actions';
 
 const translations = {
   en: {
@@ -101,13 +102,13 @@ export default function Home() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+        {/* ✅ 改成使用 Server Action */}
+        <form action={loginPublic} className="mt-8 space-y-5">
           <div>
             <label className="block text-sm font-semibold text-gray-700">{t.username}</label>
             <input 
               type="text" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              name="username"
               required 
               className="mt-1.5 w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               placeholder={t.username}

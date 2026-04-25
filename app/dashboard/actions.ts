@@ -2,6 +2,7 @@
 'use server';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
@@ -159,3 +160,27 @@ import { redirect } from 'next/navigation';
   export async function clearFilters() {
     redirect('/dashboard');
   }
+
+  export async function loginPublic(formData: FormData) {
+  const username = formData.get('username') as string;
+  const password = formData.get('password') as string;
+
+  // 簡單驗證邏輯 (你可以改成查 DB)
+  const VALID_USERS = [
+    { username: 'admin', password: 'password123' },
+    { username: 'user', password: 'user123' },
+    { username: 'test', password: 'test123' },
+  ];
+  const user = VALID_USERS.find(
+    (u) => u.username === username && u.password === password
+  );
+
+  if (user) {
+    const cookieStore = await cookies();
+    cookieStore.set('auth_tenant', 'public');
+    cookieStore.set('isLoggedIn', 'true');
+    redirect('/dashboard');
+  }
+
+  redirect('/');
+}
