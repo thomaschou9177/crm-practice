@@ -196,7 +196,12 @@ for (const key of allDynamicKeys) {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
-          <form action={handleLogout.bind(null, authTenant)}><button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">Logout</button></form>
+          <form action={handleLogout}>
+            <input type="hidden" name="tenant" value={authTenant} />
+            <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">
+              Logout
+            </button>
+          </form>
         </div>
 
 {/* IMPORT BAR */}

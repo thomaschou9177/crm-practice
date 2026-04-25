@@ -42,6 +42,7 @@ export function middleware(request: NextRequest) {
         const correctDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
         const url = new URL(correctDash, request.url);
         url.searchParams.set('pending_switch', pathname);
+        url.searchParams.set('target_tenant', targetTenant); // ✅ 新增目標租戶
         return NextResponse.redirect(url);
     }
   }

@@ -6,8 +6,10 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
-  export async function handleLogout(tenant:string, targetTenant?: string) { 
+  export async function handleLogout(formData:FormData) { 
     const { cookies } = await import('next/headers');
+    const tenant = formData.get('tenant')?.toString() || 'public';
+    const targetTenant = formData.get('target_tenant')?.toString();
     const cookieStore = await cookies();
     cookieStore.delete('auth_tenant');
     cookieStore.delete('isLoggedIn');
