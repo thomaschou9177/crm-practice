@@ -10,6 +10,11 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // 防止在 chrome-error:// 或非本站域名執行
+    if (!window.location.href.startsWith("https://crm-practice.vercel.app")) return;
+
     const pendingSwitch = searchParams.get("pending_switch");
     const targetTenant = searchParams.get("target_tenant");
 
@@ -18,7 +23,6 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         `您目前已登入 ${currentTenant}，是否要登出並切換至 ${targetTenant}?`
       );
       if (confirmed && formRef.current) {
-        // ✅ 送出隱藏表單，呼叫 handleLogout
         formRef.current.requestSubmit();
       } else {
         // 使用者取消 → 回到原本 dashboard

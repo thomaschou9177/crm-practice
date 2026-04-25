@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // 忽略 Next.js 系統路徑
   if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.includes('favicon.ico')) {
     return NextResponse.next();
   }
@@ -21,20 +22,15 @@ export function middleware(request: NextRequest) {
   const isDashboardArea = pathname === '/dashboard' || pathname.includes('/dashboard');
 
   // --- 規則：跨租戶或同租戶登入頁/dashboard → 交給 TenantGuard ---
-  if ((isLoginPage || isDashboardArea) && isLoggedIn && authTenant && authTenant !== targetTenant) {
-    const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
-    const url = new URL(currentDash, request.url);
-    url.searchParams.set('pending_switch', pathname);
-    url.searchParams.set('target_tenant', targetTenant);
-    return NextResponse.redirect(url);
-  }
-
-  if ((isLoginPage || isDashboardArea) && isLoggedIn && authTenant && authTenant === targetTenant) {
-    const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
-    const url = new URL(currentDash, request.url);
-    url.searchParams.set('pending_switch', pathname);
-    url.searchParams.set('target_tenant', targetTenant);
-    return NextResponse.redirect(url);
+  if ((isLoginPage || isDashboardArea) && isLoggedIn && authTenant) {
+    if (authTenant !== targetTenant || authTenant === targetTenant) {
+      const origin = request.nextUrl.origin;
+      const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
+      const url = new URL(currentDash, origin);
+      url.searchParams.set('pending_switch', pathname);
+      url.searchParams.set('target_tenant', targetTenant);
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next();
