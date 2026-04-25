@@ -6,11 +6,15 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
-  export async function handleLogout(tenant:string) { 
+  export async function handleLogout(tenant:string, targetTenant?: string) { 
     const { cookies } = await import('next/headers');
     const cookieStore = await cookies();
     cookieStore.delete('auth_tenant');
     cookieStore.delete('isLoggedIn');
+    // ✅ 如果有 targetTenant，優先導向它的登入頁
+    if (targetTenant && targetTenant !== 'public') {
+      redirect(`/${targetTenant}`);
+    }
     // 如果是 public，導向 /；如果是租戶，導向 /tenant1
     const redirectPath = tenant === 'public' ? '/' : `/${tenant}`;
     redirect(redirectPath); 

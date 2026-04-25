@@ -27,6 +27,7 @@ export function middleware(request: NextRequest) {
     const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
     const url = new URL(currentDash, request.url);
     url.searchParams.set('pending_switch', pathname); // 告訴 TenantGuard 使用者想去哪
+    url.searchParams.set('target_tenant', targetTenant); // ✅ 新增目標租戶
     return NextResponse.redirect(url);
   }
 
