@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
   let targetTenant = pathSegments[1] || 'public';
   if (targetTenant === 'dashboard') targetTenant = 'public';
 
-  const isLoginPage = pathname === '/' ||pathname === '/dashboard' || pathname === '/tenant1' || pathname === '/tenant2';
+  const isLoginPage = pathname === '/' || pathname === '/tenant1' || pathname === '/tenant2';
   const isDashboardArea = pathname === '/dashboard' || pathname.includes('/dashboard');
 
   // --- 關鍵修改：處理跨租戶 URL 手動更改 ---
