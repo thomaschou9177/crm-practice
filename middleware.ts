@@ -19,6 +19,19 @@ export function middleware(request: NextRequest) {
   const isLoginPage = pathname === '/' || pathname === '/tenant1' || pathname === '/tenant2';
   const isDashboardArea = pathname === '/dashboard' || pathname.includes('/dashboard');
 
+  // --- 規則 0：未登入阻擋 ---
+  if (isDashboardArea && (!isLoggedIn || !authTenant)) {
+    const origin = request.nextUrl.origin;
+    let loginPage;
+    if (pathname.startsWith('/tenant1')) {
+      loginPage = new URL('/tenant1', origin);
+    } else if (pathname.startsWith('/tenant2')) {
+      loginPage = new URL('/tenant2', origin);
+    } else {
+      loginPage = new URL('/', origin); // public
+    }
+    return NextResponse.redirect(loginPage);
+  }
   // --- 規則 1：跨租戶切換 ---
   if ((isLoginPage || isDashboardArea) && isLoggedIn && authTenant && authTenant !== targetTenant) {
     const origin = request.nextUrl.origin;
