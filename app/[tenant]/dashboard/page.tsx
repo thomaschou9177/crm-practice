@@ -343,12 +343,12 @@ for (const key of allDynamicKeys) {
                     {['name', 'email', 'role'].map((field) => (
                       <td key={field} className="p-0 border-r">
                         <EditableInput
-                            id={c.id}
-                            field={field}
-                            defaultValue={c[field] || ''}
-                            action={updateCoreDataWithTenant}
-                            className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 focus:outline-none focus:bg-white px-1 py-0.5 rounded transition-all"
-                         />
+                          id={c.id}
+                          field="name"
+                          defaultValue={c.name || ''}
+                          tenant={tenant}
+                          className="w-full bg-transparent border-b border-transparent focus:border-indigo-500"
+                        />
                       </td>
                     ))}
                     {allDynamicKeys.map(key => (
@@ -357,8 +357,8 @@ for (const key of allDynamicKeys) {
                           id={c.id}
                           metadataKey={key}
                           defaultValue={c.metadata?.[key] || ''}
-                          action={updateMetadataCellWithTenant}
-                          className="w-full bg-transparent border-b border-transparent focus:border-amber-500 focus:outline-none text-indigo-600"
+                          tenant={tenant}
+                          className="w-full bg-transparent border-b border-transparent focus:border-amber-500 text-indigo-600"
                         />
                       </td>
                     ))}
