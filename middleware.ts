@@ -17,8 +17,8 @@ export function middleware(request: NextRequest) {
   let targetTenant = pathSegments[1] || 'public';
   if (targetTenant === 'dashboard') targetTenant = 'public';
 
-  const isLoginPage = pathname === '/' || pathname === '/tenant1' || pathname === '/tenant2';
-  const isDashboardArea = pathname.includes('/dashboard');
+  const isLoginPage = pathname === '/' ||pathname === '/dashboard' || pathname === '/tenant1' || pathname === '/tenant2';
+  const isDashboardArea = pathname === '/dashboard' || pathname.includes('/dashboard');
 
   // --- 關鍵修改：處理跨租戶 URL 手動更改 ---
   // 如果已登入 A，但使用者手動輸入了 B 的登入頁面 (例如從 tenant2/dashboard 改成 /tenant1)
@@ -47,3 +47,7 @@ export function middleware(request: NextRequest) {
 
   return NextResponse.next();
 }
+// ✅ matcher 設定，避免影響 _next、api 等系統路徑
+export const config = {
+  matcher: ['/((?!_next|api|favicon.ico).*)'],
+};
