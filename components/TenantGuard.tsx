@@ -1,6 +1,6 @@
 // components/TenantGuard.tsx
 "use client";
-import { handleLogout } from "@/app/dashboard/actions"; // 或動態租戶的 actions，看你放在哪裡
+import { handleLogout } from "@/app/dashboard/actions";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
@@ -12,8 +12,9 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // 防止在 chrome-error:// 或非本站域名執行
-    if (!window.location.href.startsWith("https://crm-practice.vercel.app")) return;
+    // 防止在錯誤頁或跨來源 context 執行
+    const href = window.location.href;
+    if (!href.startsWith(window.location.origin)) return;
 
     const pendingSwitch = searchParams.get("pending_switch");
     const targetTenant = searchParams.get("target_tenant");
@@ -25,7 +26,6 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       if (confirmed && formRef.current) {
         formRef.current.requestSubmit();
       } else {
-        // 使用者取消 → 回到原本 dashboard
         router.push(
           currentTenant === "public" ? "/dashboard" : `/${currentTenant}/dashboard`
         );
