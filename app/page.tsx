@@ -119,8 +119,7 @@ export default function Home() {
             <label className="block text-sm font-semibold text-gray-700">{t.password}</label>
             <input 
               type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              name="password"  
               required 
               className="mt-1.5 w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               placeholder={t.password}
