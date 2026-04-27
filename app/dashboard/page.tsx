@@ -9,16 +9,16 @@ import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
 import TenantGuard from '@/components/TenantGuard';
 import { prisma } from '@/lib/db';
-import { cookies } from 'next/headers'; // 1. 引入 cookies
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateSyncEmail } from './actions';
 export default async function DashboardPage(props:{
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
  {
-  // 3. 權限檢查邏輯
-  const cookieStore = await cookies();
-  const isLoggedIn = cookieStore.get('isLoggedIn')?.value==='true';
-  const authTenant = cookieStore.get('auth_tenant')?.value|| 'public';
+
+  // // 3. 權限檢查邏輯
+  // const cookieStore = await cookies();
+  // const isLoggedIn = cookieStore.get('isLoggedIn')?.value==='true';
+  // const authTenant = cookieStore.get('auth_tenant')?.value|| 'public';
 
   // 如果沒登入，或是登入的不是 public，強制踢回根目錄 /
 
@@ -342,7 +342,7 @@ for (const key of allDynamicKeys) {
                           id={c.id}
                           field={field}
                           defaultValue={c[field] || ''}
-                          tenant={authTenant}
+                          tenant="public"
                           className="w-full bg-transparent border-b border-transparent focus:border-indigo-500"
                          />
                       </td>
@@ -353,7 +353,7 @@ for (const key of allDynamicKeys) {
                           id={c.id}
                           metadataKey={key}
                           defaultValue={c.metadata?.[key] || ''}
-                          tenant={authTenant}
+                          tenant="public"
                           className="w-full bg-transparent border-b border-transparent focus:border-amber-500 text-indigo-600"
                         />
                       </td>

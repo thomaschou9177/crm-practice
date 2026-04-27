@@ -1,6 +1,7 @@
 // /middleware.ts
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { getSession } from './lib/session';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -9,8 +10,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const authTenant = request.cookies.get('auth_tenant')?.value;
-  const isLoggedIn = request.cookies.get('isLoggedIn')?.value === 'true';
+  // 從 cookie 讀取 sessionId
+  const sessionId = request.cookies.get('sessionId')?.value;
+  const session = sessionId ? getSession(sessionId) : null;
+
+  const authTenant = session?.tenant;
+  const isLoggedIn = session?.isLoggedIn === 'true';
 
   // const pathSegments = pathname.split('/');
   // let targetTenant = pathSegments[1] || 'public';
@@ -21,7 +26,7 @@ export function middleware(request: NextRequest) {
   let targetTenant = segments[0] || 'public';
   if (targetTenant === 'dashboard') targetTenant = 'public';
 
-  const isLoginPage = pathname === '/' || pathname === '/tenant1' || pathname === '/tenant2';
+  const isLoginPage = pathname === '/' || (segments.length === 1 && segments[0] !== 'dashboard');
   const isDashboardArea = pathname === '/dashboard' || pathname.includes('/dashboard');
 
   // --- 規則 0：未登入阻擋 ---
