@@ -1,4 +1,5 @@
 // app/dashboard/page.tsx
+"use client"
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 import DeleteAllDataButton from '@/components/DeleteAllDataButton';
@@ -9,8 +10,23 @@ import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
 import TenantGuard from '@/components/TenantGuard';
 import { prisma } from '@/lib/db';
+import { useEffect } from 'react';
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateSyncEmail } from './actions';
-export default async function DashboardPage(props:{
+export default function DashboardPageWrapper(props:{
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  // ✅ 分頁關閉時自動登出
+  useEffect(() => {
+    const handleUnload = () => {
+      navigator.sendBeacon("/api/logout");
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, []);
+
+  return <DashboardPage {...props} />;
+}
+async function DashboardPage(props:{
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
  {
