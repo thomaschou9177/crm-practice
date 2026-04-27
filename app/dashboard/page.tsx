@@ -340,8 +340,8 @@ for (const key of allDynamicKeys) {
                       <td key={field} className="p-0 border-r">
                         <EditableInput
                           id={c.id}
-                          field="name"
-                          defaultValue={c.name || ''}
+                          field={field}
+                          defaultValue={c[field] || ''}
                           tenant={authTenant}
                           className="w-full bg-transparent border-b border-transparent focus:border-indigo-500"
                          />
