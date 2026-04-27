@@ -1,5 +1,4 @@
 // app/dashboard/page.tsx
-"use client"
 export const dynamic = 'force-dynamic';
 export const revalidate = false;
 import DeleteAllDataButton from '@/components/DeleteAllDataButton';
@@ -10,44 +9,11 @@ import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
 import TenantGuard from '@/components/TenantGuard';
 import { prisma } from '@/lib/db';
-import { useEffect } from 'react';
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateSyncEmail } from './actions';
-export default function DashboardPageWrapper(props:{
-  searchParams: Promise<Record<string, string | undefined>>;
-}) {
-  // ✅ 分頁關閉時自動登出
-  useEffect(() => {
-    const handleUnload = () => {
-      navigator.sendBeacon("/api/logout");
-    };
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
-  }, []);
-
-  return <DashboardPage {...props} />;
-}
-async function DashboardPage(props:{
+export default async function DashboardPage(props:{
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
  {
-
-  // // 3. 權限檢查邏輯
-  // const cookieStore = await cookies();
-  // const isLoggedIn = cookieStore.get('isLoggedIn')?.value==='true';
-  // const authTenant = cookieStore.get('auth_tenant')?.value|| 'public';
-
-  // 如果沒登入，或是登入的不是 public，強制踢回根目錄 /
-
-  // if (!isLoggedIn || !authTenant) {
-  //   redirect('/');
-  // }
-
-  // 如果登入租戶不是 'public'，導向到該租戶正確的 dashboard
-
-  // if (authTenant !== 'public') {
-  //   redirect(`/${authTenant}/dashboard`);
-  // }
-
   // ✅ await 解開 Promise
   const params: Record<string, string | undefined> =await props.searchParams;
   // --- 新增：分頁參數計算 ---

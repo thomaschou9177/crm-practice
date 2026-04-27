@@ -1,8 +1,6 @@
 // app/[tenant]/dashboard/page.tsx
-"use client"
 export const dynamic = 'force-dynamic';
 export const revalidate = false;
-
 import DeleteAllDataButton from '@/components/DeleteAllDataButton';
 import { DeleteColumnButton } from '@/components/DeleteColumnButton';
 import { DeleteRowButton } from '@/components/DeleteRowButton';
@@ -11,24 +9,8 @@ import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
 import TenantGuard from '@/components/TenantGuard';
 import { getPrismaClient } from '@/lib/db';
-import { useEffect } from 'react';
 import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
-export default function DashboardPageWrapper(props:{
-  params: Promise<{ tenant: string }>;
-  searchParams: Promise<Record<string, string | undefined>>;
-}) {
-  // ✅ 分頁關閉時自動登出
-  useEffect(() => {
-    const handleUnload = () => {
-      navigator.sendBeacon("/api/logout");
-    };
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
-  }, []);
-
-  return <DashboardPage {...props} />;
-}
-async function DashboardPage(props:{
+export default async function DashboardPage(props:{
   params: Promise<{ tenant: string }>; // 獲取 URL 中的 [tenant]
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
