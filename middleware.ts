@@ -15,7 +15,7 @@ export function middleware(request: NextRequest) {
   const session = sessionId ? getSession(sessionId) : null;
 
   const authTenant = session?.tenant;
-  const isLoggedIn = session?.isLoggedIn === 'true';
+  const isLoggedIn = Boolean(session?.isLoggedIn);
 
   // const pathSegments = pathname.split('/');
   // let targetTenant = pathSegments[1] || 'public';
