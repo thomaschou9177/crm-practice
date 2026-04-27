@@ -1,15 +1,19 @@
 // app/api/logout/route.ts
-import { destroySession } from "@/lib/session";
-import { cookies } from "next/headers";
+import { destroySession } from '@/lib/session';
+import { NextResponse } from 'next/server';
 
-export async function POST() {
-  const cookieStore = await cookies();
-  const sessionId = cookieStore.get("sessionId")?.value;
+export async function POST(request: Request) {
+  const cookieHeader = request.headers.get('cookie') || '';
+  const sessionId = cookieHeader
+    .split('; ')
+    .find(c => c.startsWith('sessionId='))
+    ?.split('=')[1];
 
   if (sessionId) {
-    destroySession(sessionId); // 刪除伺服器端 session
-    cookieStore.delete("sessionId"); // 刪除 cookie
+    destroySession(sessionId);
   }
 
-  return new Response("Session destroyed", { status: 200 });
+  const response = NextResponse.json({ success: true });
+  response.cookies.delete('sessionId');
+  return response;
 }

@@ -2,7 +2,6 @@
 'use server';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
@@ -10,9 +9,12 @@ import { redirect } from 'next/navigation';
   const tenant = formData.get('tenant')?.toString() || 'public';
   const targetTenant = formData.get('target_tenant')?.toString();
 
-  const cookieStore = await cookies();
-  cookieStore.delete('auth_tenant');
-  cookieStore.delete('isLoggedIn');
+  // ✅ 呼叫 /api/logout，刪除 session
+  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/logout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    // sendBeacon 不支援 await，所以這裡用 fetch
+  });
 
   // ✅ TenantGuard 會傳 targetTenant，優先導向它
   if (targetTenant) {
@@ -176,22 +178,22 @@ import { redirect } from 'next/navigation';
   const username = formData.get('username') as string;
   const password = formData.get('password') as string;
 
-  // 簡單驗證邏輯 (你可以改成查 DB)
-  const VALID_USERS = [
-    { username: 'admin', password: 'password123' },
-    { username: 'user', password: 'user123' },
-    { username: 'test', password: 'test123' },
-  ];
-  const user = VALID_USERS.find(
-    (u) => u.username === username && u.password === password
-  );
+  // ✅ 呼叫 /api/login，由 API 建立 session 並設定 sessionId cookie
+  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username,
+      password,
+      tenant: 'public', // 固定 public schema
+    }),
+  });
 
-  if (user) {
-    const cookieStore = await cookies();
-    cookieStore.set('auth_tenant', 'public');
-    cookieStore.set('isLoggedIn', 'true');
+  if (res.ok) {
+    // 登入成功 → 導向 public dashboard
     redirect('/dashboard');
+  } else {
+    // 登入失敗 → 導回登入頁
+    redirect('/');
+    }
   }
-
-  redirect('/');
-}
