@@ -2,7 +2,9 @@
 'use server';
 
 import { getPrismaClient } from '@/lib/db';
+import { createSession, destroySession } from '@/lib/session';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
@@ -10,22 +12,20 @@ import { redirect } from 'next/navigation';
   const tenant = formData.get('tenant')?.toString() || 'public';
   const targetTenant = formData.get('target_tenant')?.toString();
 
-  // ✅ 呼叫 /api/logout，刪除 session
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/logout`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get('sessionId')?.value;
 
-  // ✅ TenantGuard 會傳 targetTenant，優先導向它
-  if (targetTenant) {
-    if (targetTenant === 'public') {
-      redirect('/');
-    } else {
-      redirect(`/${targetTenant}`);
-    }
+  // ✅ 1. 呼叫 destroySession 確保資料庫紀錄被刪除[cite: 11]
+  if (sessionId) {
+    await destroySession(sessionId);
   }
 
-  // fallback：沒有 targetTenant 時，依 tenant 判斷
+  // ✅ 2. 清除 Cookie
+  cookieStore.delete('sessionId');
+
+  if (targetTenant) {
+    redirect(targetTenant === 'public' ? '/' : `/${targetTenant}`);
+  }
   redirect(tenant === 'public' ? '/' : `/${tenant}`);
 }
 
@@ -189,36 +189,57 @@ import { redirect } from 'next/navigation';
   export async function clearFilters(tenant:string) {
     redirect(`/${tenant}/dashboard`);
   }
-
-  export async function loginTenant(formData: FormData) {
+  // 定義帳號清單 (對應你的要求)
+const TENANT_USERS: Record<string, { username: string; password: string }[]> = {
+  tenant1: [
+    { username: "tenant1admin", password: "t1password123" },
+    { username: "tenant1user", password: "t1user123" },
+    { username: "tenant1test", password: "t1test123" },
+  ],
+  tenant2: [
+    { username: "tenant2admin", password: "t2password123" },
+    { username: "tenant2user", password: "t2user123" },
+    { username: "tenant2test", password: "t2test123" },
+  ],
+  // 可以依此類推...
+};
+  export async function loginTenant(prevState:any,formData: FormData) {
   const username = formData.get('username') as string;
   const password = formData.get('password') as string;
   const tenant = formData.get('tenant')?.toString() || 'public';
 
-  // ✅ 呼叫 /api/login，由 API 建立 session 並設定 sessionId cookie
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      username,
-      password,
-      tenant, // 動態租戶
-    }),
-  });
+  // ✅ 1. 根據動態 tenant 找到對應的帳號清單
+  const validUsers = TENANT_USERS[tenant] || [];
+  const user = validUsers.find(
+    (u) => u.username === username && u.password === password
+  );
 
-  if (res.ok) {
-    // 登入成功 → 導向對應租戶的 dashboard
-    if (tenant === 'public') {
-      redirect('/dashboard');
-    } else {
-      redirect(`/${tenant}/dashboard`);
-    }
+  if (user) {
+    // ✅ 建立持久化的 Session 並取得 ID
+    const sessionId = await createSession({
+      tenant: tenant,
+      isLoggedIn: true,
+      user: { name: user.username }
+    });
+    // ✅ 2. 驗證成功，直接建立 Session (不使用 fetch)
+    const cookieStore = await cookies();
+    
+    // 如果你有後端 session store (例如 lib/session.ts)，在這裡建立
+    // const sessionId = createSession({ tenant, user: username }); 
+    // ✅ 3. 設定 Session Cookie
+    cookieStore.set('sessionId', sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      // ⚠️ 不設 maxAge，達成關閉瀏覽器即失效
+    });
+
+    // 導向該 tenant 的 dashboard
+    redirect(tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard`);
   } else {
-    // 登入失敗 → 導回租戶登入頁
-    if (tenant === 'public') {
-      redirect('/');
-    } else {
-      redirect(`/${tenant}`);
-    }
+    // 驗證失敗
+    // ✅ 失敗時不 redirect，直接回傳錯誤訊息給前端
+    return { error: "帳號或密碼錯誤，請重新輸入。" };
   }
 }

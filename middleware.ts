@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getSession } from './lib/session';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.includes('favicon.ico')) {
@@ -12,7 +12,8 @@ export function middleware(request: NextRequest) {
 
   // 從 cookie 讀取 sessionId
   const sessionId = request.cookies.get('sessionId')?.value;
-  const session = sessionId ? getSession(sessionId) : null;
+  // ✅ 改為 await 取得 Supabase 資料[cite: 10]
+  const session = sessionId ? await getSession(sessionId) : null;
 
   const authTenant = session?.tenant;
   const isLoggedIn = Boolean(session?.isLoggedIn);

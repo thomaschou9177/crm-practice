@@ -1,31 +1,29 @@
 // app/dashboard/actions.ts
 'use server';
 import { prisma } from '@/lib/db';
+import { createSession, destroySession } from '@/lib/session';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
   export async function handleLogout(formData: FormData) {
   const tenant = formData.get('tenant')?.toString() || 'public';
-  const targetTenant = formData.get('target_tenant')?.toString();
+  // const targetTenant = formData.get('target_tenant')?.toString();
 
-  // ✅ 呼叫 /api/logout，刪除 session
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/logout`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    // sendBeacon 不支援 await，所以這裡用 fetch
-  });
+  // 這裡「不需要」呼叫 API
+  // 在 Server Action 中直接刪除 Cookie 是最快、最穩定的做法
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get('sessionId')?.value;
 
-  // ✅ TenantGuard 會傳 targetTenant，優先導向它
-  if (targetTenant) {
-    if (targetTenant === 'public') {
-      redirect('/');
-    } else {
-      redirect(`/${targetTenant}`);
-    }
+  if (sessionId) {
+    // 如果後端有 session store，在這裡銷毀它
+    await destroySession(sessionId); 
   }
 
-  // fallback：沒有 targetTenant 時，依 tenant 判斷
+  cookieStore.delete('sessionId');
+
+  // 導向首頁
   redirect(tenant === 'public' ? '/' : `/${tenant}`);
 }
 
@@ -174,26 +172,63 @@ import { redirect } from 'next/navigation';
     redirect('/dashboard');
   }
 
-  export async function loginPublic(formData: FormData) {
+  // 定義帳號清單
+  const PUBLIC_USERS = [
+    { username: "admin", password: "password123" },
+    { username: "user", password: "user123" },
+    { username: "test", password: "test123" },
+  ];
+
+  export async function loginPublic(prevState: any,formData: FormData) {
   const username = formData.get('username') as string;
   const password = formData.get('password') as string;
 
-  // ✅ 呼叫 /api/login，由 API 建立 session 並設定 sessionId cookie
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      username,
-      password,
-      tenant: 'public', // 固定 public schema
-    }),
-  });
+  // ✅ 1. 執行三組帳號驗證
+  const user = PUBLIC_USERS.find(
+    (u) => u.username === username && u.password === password
+  );
 
-  if (res.ok) {
-    // 登入成功 → 導向 public dashboard
+  if (user) {
+    // ✅ 建立持久化的 Session 並取得 ID
+    const sessionId = await createSession({
+      tenant: 'public',
+      isLoggedIn: true,
+      user: { name: user.username }
+    });
+    // ✅ 2. 直接操作 Cookie，不要 fetch /api/login (避免 URL 解析錯誤)
+    const cookieStore = await cookies();
+    
+    // 設定 Session Cookie (不給 maxAge，分頁關閉時瀏覽器會視情況清理)
+    cookieStore.set('sessionId', sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+
     redirect('/dashboard');
   } else {
-    // 登入失敗 → 導回登入頁
-    redirect('/');
-    }
+    // 驗證失敗
+    // ✅ 失敗時不 redirect，直接回傳錯誤訊息給前端
+    return { error: "帳號或密碼錯誤，請重新輸入。" };
+  }
+
+  // // ✅ 呼叫 /api/login，由 API 建立 session 並設定 sessionId cookie
+  // const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/login`, {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify({
+  //     username,
+  //     password,
+  //     tenant: 'public', // 固定 public schema
+  //   }),
+  // });
+
+  // if (res.ok) {
+  //   // 登入成功 → 導向 public dashboard
+  //   redirect('/dashboard');
+  // } else {
+  //   // 登入失敗 → 導回登入頁
+  //   redirect('/');
+  //   }
   }

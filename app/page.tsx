@@ -2,7 +2,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation'; // Import the router
-import { useState } from 'react';
+import { useActionState, useState } from 'react';
 import { loginPublic } from './dashboard/actions';
 
 const translations = {
@@ -50,7 +50,7 @@ export default function Home() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
+  const [state, formAction, isPending] = useActionState(loginPublic, null);
   const t = translations[lang];
   // const handleSubmit = (e: React.FormEvent) => {
   //   e.preventDefault();
@@ -96,14 +96,14 @@ export default function Home() {
           <p className="mt-3 text-sm text-gray-500">{t.subtitle}</p>
         </div>
         
-        {error && (
+        {state?.error && (
           <div className="mt-6 rounded-lg bg-red-50 p-3 text-sm text-red-600 border border-red-200 text-center">
-            {error}
+            {state.error}
           </div>
         )}
 
         {/* ✅ 改成使用 Server Action */}
-        <form action={loginPublic} className="mt-8 space-y-5">
+        <form action={formAction} className="mt-8 space-y-5">
           <div>
             <label className="block text-sm font-semibold text-gray-700">{t.username}</label>
             <input 
@@ -128,9 +128,12 @@ export default function Home() {
 
           <button 
             type="submit"
-            className="w-full rounded-xl bg-blue-600 py-4 font-bold text-white transition-all hover:bg-blue-700 active:scale-[0.98] shadow-lg shadow-blue-200"
+            disabled={isPending} // ✅ 防止重複提交
+            className={`w-full rounded-xl py-4 font-bold text-white transition-all shadow-lg ${
+              isPending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-200'
+            }`}
           >
-            {t.signIn}
+            {isPending ? 'Signing In...' : t.signIn}
           </button>
         </form>
 
