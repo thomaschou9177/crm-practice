@@ -18,8 +18,8 @@ export type SessionData = {
  * 這樣在 Vercel 編譯掃描檔案時，不會因為抓不到環境變數而直接崩潰。
  */
 const getSupabase = () => {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
     // 只有在實際運行且缺少變數時才報錯，編譯期間若沒用到則不會觸發
