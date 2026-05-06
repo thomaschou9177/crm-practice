@@ -66,9 +66,15 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         const originalTenant = authTenant || currentTenant;
         const safePath = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
         
-        // 2. 使用 router.push 跳轉
-        // 由於 router.push 預設會導向純淨路徑，這會移除網址上的 pending_switch 等參數
-        router.push(safePath);
+        // 1. 強制執行一次 Cookie 同步，確保 Middleware 能讀到正確的 sessionId[cite: 11]
+        const sid = sessionStorage.getItem('tab_session_id');
+        if (sid) {
+          document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
+        }
+
+        // 2. 使用 router.replace 替代 push
+        // replace 不會增加瀏覽紀錄，且能更乾淨地移除網址上的 pending_switch 參數
+        router.replace(safePath);
       }
     }
   }, [searchParams, currentTenant, router]);
