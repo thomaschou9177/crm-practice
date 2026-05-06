@@ -33,15 +33,6 @@ export async function middleware(request: NextRequest) {
 
   // --- 規則 0：未登入阻擋 ---
   if (isDashboardArea && !isLoggedIn) {
-    // 🚀 核心解決點：如果帶有 auth_tenant 且其值與當前路徑相符，代表是「選擇否」回跳的請求
-    // 我們給予放行，讓頁面組件加載後由 TenantGuard 再次執行邏輯 A 的 Cookie 同步[cite: 15, 16]
-    const backFromSwitch = searchParams.get('auth_tenant');
-    const isReturningToSafePath = (backFromSwitch === 'public' && targetTenant === 'public') || (backFromSwitch === targetTenant);
-
-    if (isReturningToSafePath) {
-      return NextResponse.next();
-    }
-
     const origin = request.nextUrl.origin;
     const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
     return NextResponse.redirect(loginPage);
