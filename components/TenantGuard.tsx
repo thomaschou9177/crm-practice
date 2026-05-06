@@ -46,10 +46,12 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
 
     const pendingSwitch = searchParams.get("pending_switch");
     const targetTenant = searchParams.get("target_tenant");
+    // ✅ 新增：從 Middleware 傳過來的參數讀取使用者「真正」登入的租戶
+    const authTenant = searchParams.get("auth_tenant");
 
     if (pendingSwitch && targetTenant) {
       const confirmed = window.confirm(
-        `您目前已登入 ${currentTenant}，是否要登出並切換至 ${targetTenant}? (此操作將登出目前帳號)`
+        `您目前已登入 ${authTenant}，是否要登出並切換至 ${targetTenant}? (此操作將登出目前帳號)`
       );
       if (confirmed && formRef.current) {
         // 登出前，手動把 sessionStorage 的 ID 填入隱藏欄位
@@ -59,9 +61,14 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         formRef.current.requestSubmit();
         sessionStorage.removeItem('tab_session_id'); // 清除本地狀態
       } else {
-        router.push(
-          currentTenant === "public" ? "/dashboard" : `/${currentTenant}/dashboard`
-        );
+        // --- 選擇「否」：維持原畫面邏輯 ---
+        // 1. 決定回歸路徑
+        const originalTenant = authTenant || currentTenant;
+        const safePath = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
+        
+        // 2. 使用 router.push 跳轉
+        // 由於 router.push 預設會導向純淨路徑，這會移除網址上的 pending_switch 等參數
+        router.push(safePath);
       }
     }
   }, [searchParams, currentTenant, router]);
