@@ -75,8 +75,10 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
           document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
         }
 
-        // 4. 使用原生 replace 跳轉，強制重新觸發具備正確 Cookie 的請求[cite: 16]
-        window.location.replace(safeUrl.toString());
+        // ✅ 延遲跳轉，確保 cookie 已寫入再觸發 middleware
+        setTimeout(() => {
+          window.location.replace(new URL(path, origin).toString());
+        }, 50);
       }
     }
   }, [searchParams, currentTenant, router]);
