@@ -179,7 +179,7 @@ for (const key of allDynamicKeys) {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
-          <LogoutButton/>
+          <LogoutButton tenant='public'/>
         </div>
 
 {/* IMPORT BAR */}

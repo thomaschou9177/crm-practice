@@ -7,9 +7,10 @@ import { DeleteRowButton } from '@/components/DeleteRowButton';
 import EditableInput from '@/components/EditableInput';
 import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
+import LogoutButton from '@/components/LogoutButton';
 import TenantGuard from '@/components/TenantGuard';
 import { getPrismaClient } from '@/lib/db';
-import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
+import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleSyncSearch, handleTableSearch, updateCoreData, updateMetadataCell, updateSyncEmail } from './actions';
 export default async function DashboardPage(props:{
   params: Promise<{ tenant: string }>; // 獲取 URL 中的 [tenant]
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
@@ -205,20 +206,7 @@ for (const key of allDynamicKeys) {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
-          <form action={handleLogout} onSubmit={(e) => {
-              const sid = sessionStorage.getItem('tab_session_id');
-              if (sid) {
-                const input = e.currentTarget.querySelector('input[name="sessionId"]') as HTMLInputElement;
-                input.value = sid;
-              }
-            }}
-          >
-            <input type="hidden" name="tenant" value={tenant} />
-            <input type="hidden" name="sessionId" value="" />
-            <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm hover:bg-red-50">
-              Logout
-            </button>
-          </form>
+          <LogoutButton tenant={tenant}/>
         </div>
 
 {/* IMPORT BAR */}

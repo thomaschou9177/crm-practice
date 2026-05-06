@@ -2,7 +2,7 @@
 
 import { handleLogout } from "@/app/dashboard/actions";
 
-export default function LogoutButton() {
+export default function LogoutButton({ tenant }: { tenant: string }) {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     // 從 sessionStorage 抓取 ID 並填入隱藏欄位
     const sid = sessionStorage.getItem('tab_session_id');
@@ -14,7 +14,7 @@ export default function LogoutButton() {
 
   return (
     <form action={handleLogout} onSubmit={handleSubmit}>
-      <input type="hidden" name="tenant" value="public" />
+      <input type="hidden" name="tenant" value={tenant} />
       <input type="hidden" name="sessionId" value="" />
       <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">
         Logout
