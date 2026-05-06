@@ -7,9 +7,10 @@ import { DeleteRowButton } from '@/components/DeleteRowButton';
 import EditableInput from '@/components/EditableInput';
 import ImportBar from '@/components/ImportBar';
 import JumpToPage from '@/components/JumpToPage';
+import LogoutButton from '@/components/LogoutButton';
 import TenantGuard from '@/components/TenantGuard';
 import { prisma } from '@/lib/db';
-import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleLogout, handleSyncSearch, handleTableSearch, updateSyncEmail } from './actions';
+import { addCustomer, addOrUpdateColumn, clearFilters, deleteRow, deleteWholeColumn, handleSyncSearch, handleTableSearch, updateSyncEmail } from './actions';
 export default async function DashboardPage(props:{
   searchParams: Promise<Record<string, string | undefined>>; //把 searchParams 的型別明確指定成 Record<string, string | undefined>
  })
@@ -178,20 +179,7 @@ for (const key of allDynamicKeys) {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
-          <form action={handleLogout} id="logout-form">
-            <input type="hidden" name="tenant" value="public" />
-            <input type="hidden" name="sessionId" id="logout-session-id" value="" />
-            <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm"
-              onClick={() => {
-              // 在送出前從 sessionStorage 抓取正確的 ID
-              const sid = sessionStorage.getItem('tab_session_id');
-              const input = document.getElementById('logout-session-id') as HTMLInputElement;
-              if (input && sid) input.value = sid;
-              }}
-            >
-              Logout
-            </button>
-          </form>
+          <LogoutButton/>
         </div>
 
 {/* IMPORT BAR */}
