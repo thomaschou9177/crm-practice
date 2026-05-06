@@ -50,6 +50,8 @@ export async function middleware(request: NextRequest) {
       url.searchParams.set('auth_tenant', authTenant);     // 使用者目前實際登入的地方
       return NextResponse.redirect(url);
     }
+    // ✅ 如果只是直接打錯租戶的 dashboard URL → 放行，讓 TenantGuard 處理「選擇否」
+    return NextResponse.next();
   }
 
   // --- 規則 2：同租戶登入頁 ---
