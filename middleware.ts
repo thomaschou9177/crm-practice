@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from './lib/session';
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname,searchParams } = request.nextUrl;
 
   if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.includes('favicon.ico')) {
     return NextResponse.next();
@@ -18,49 +18,44 @@ export async function middleware(request: NextRequest) {
   const authTenant = session?.tenant;
   const isLoggedIn = Boolean(session?.isLoggedIn);
 
-  // const pathSegments = pathname.split('/');
-  // let targetTenant = pathSegments[1] || 'public';
-  // if (targetTenant === 'dashboard') targetTenant = 'public';
-
   // 自動解析 URL 第一段作為 tenant
   const segments = pathname.split('/').filter(Boolean); // e.g. "/tenant3/dashboard" → ["tenant3","dashboard"]
   let targetTenant = segments[0] || 'public';
   if (targetTenant === 'dashboard') targetTenant = 'public';
 
   const isLoginPage = pathname === '/' || (segments.length === 1 && segments[0] !== 'dashboard');
-  const isDashboardArea = pathname === '/dashboard' || pathname.includes('/dashboard');
+  const isDashboardArea = pathname.includes('/dashboard');
+
+  // ✅ 重要修正：如果已經帶有 pending_switch 參數，說明已經在處理跳轉中，放行讓 TenantGuard 處理
+  if (searchParams.has('pending_switch')) {
+    return NextResponse.next();
+  }
 
   // --- 規則 0：未登入阻擋 ---
-  if (isDashboardArea && (!isLoggedIn || !authTenant)) {
+  if (isDashboardArea && !isLoggedIn) {
     const origin = request.nextUrl.origin;
-    let loginPage:URL;
-    if (!segments[0] || segments[0] === 'dashboard') {
-      // public 租戶
-      loginPage = new URL('/', origin);
-    } else {
-      // 動態租戶 → 自動導向 /{tenantSegment}
-      loginPage = new URL(`/${segments[0]}`, origin);
-    }
+    const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
     return NextResponse.redirect(loginPage);
   }
   // --- 規則 1：跨租戶切換 ---
-  if ((isLoginPage || isDashboardArea) && isLoggedIn && authTenant && authTenant !== targetTenant) {
-    const origin = request.nextUrl.origin;
-    const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
-    const url = new URL(currentDash, origin);
-    url.searchParams.set('pending_switch', pathname);
-    url.searchParams.set('target_tenant', targetTenant);
-    return NextResponse.redirect(url);
+  if (isLoggedIn && authTenant && authTenant !== targetTenant) {
+    // 只有在試圖存取別人的 Dashboard 或登入頁時才攔截
+    if (isDashboardArea || isLoginPage) {
+      const origin = request.nextUrl.origin;
+      const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
+      const url = new URL(currentDash, origin);
+      // ✅ 修正：傳遞布林值或簡單標記，避免將整個 pathname 編碼進去造成混亂
+      url.searchParams.set('pending_switch', 'true');
+      url.searchParams.set('target_tenant', targetTenant);
+      return NextResponse.redirect(url);
+    }
   }
 
   // --- 規則 2：同租戶登入頁 ---
-  if (isLoginPage && isLoggedIn && authTenant && authTenant === targetTenant) {
+  if (isLoginPage && isLoggedIn && authTenant === targetTenant) {
     const origin = request.nextUrl.origin;
     const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
-    const url = new URL(currentDash, origin);
-    url.searchParams.set('pending_switch', pathname);
-    url.searchParams.set('target_tenant', targetTenant);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL(currentDash, origin));
   }
 
   return NextResponse.next();
