@@ -33,6 +33,12 @@ export async function middleware(request: NextRequest) {
 
   // --- 規則 0：未登入阻擋 ---
   if (isDashboardArea && !isLoggedIn) {
+    // ✅ 修正：如果網址包含 auth_tenant 參數，說明是從彈窗跳回來的，暫時放行
+    // 讓頁面載入後由 TenantGuard 再次同步 Cookie
+    if (searchParams.has('auth_tenant')) {
+      return NextResponse.next();
+    }
+    
     const origin = request.nextUrl.origin;
     const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
     return NextResponse.redirect(loginPage);
