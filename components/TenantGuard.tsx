@@ -28,8 +28,14 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
 
     // 監聽分頁聚焦，確保多個分頁切換時，Cookie 永遠是該分頁的 ID
     window.addEventListener('focus', syncSession);
-    return () => window.removeEventListener('focus', syncSession);
-  }, []);
+    window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncSession();
+    });
+    return () => {
+      window.removeEventListener('focus', syncSession);
+      window.removeEventListener('visibilitychange', syncSession);
+      }
+    }, []);
   // --- 邏輯 B：原有的租戶切換監控 ---
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -60,6 +66,19 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     }
   }, [searchParams, currentTenant, router]);
   // --- 邏輯 C：新增的分頁關閉自動登出 ---
+  useEffect(() => {
+  const handleUnload = () => {
+    const sid = sessionStorage.getItem('tab_session_id');
+    if (!sid) return;
+
+    // 使用 sendBeacon 確保在分頁關閉的瞬間，請求能發送到 /api/logout
+    const blob = new Blob([JSON.stringify({ sessionId: sid })], { type: 'application/json' });
+    navigator.sendBeacon("/api/logout", blob);
+  };
+
+  window.addEventListener("beforeunload", handleUnload);
+  return () => window.removeEventListener("beforeunload", handleUnload);
+  }, []);
   
   return (
     <form ref={formRef} action={handleLogout} style={{ display: "none" }}>
