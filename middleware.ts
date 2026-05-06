@@ -33,6 +33,11 @@ export async function middleware(request: NextRequest) {
 
   // --- 規則 0：未登入阻擋 ---
   if (isDashboardArea && !isLoggedIn) {
+    // ✅ 如果 session 有 authTenant，但 targetTenant 不同，代表是「選擇否」的情境
+    if (authTenant && authTenant !== targetTenant) {
+      // 放行，讓 TenantGuard 把使用者導回原租戶 dashboard
+      return NextResponse.next();
+    }
     const origin = request.nextUrl.origin;
     const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
     return NextResponse.redirect(loginPage);
