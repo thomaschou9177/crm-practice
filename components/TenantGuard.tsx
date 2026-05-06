@@ -74,7 +74,11 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
 
         // 2. 使用 router.replace 替代 push
         // replace 不會增加瀏覽紀錄，且能更乾淨地移除網址上的 pending_switch 參數
-        router.replace(safePath);
+        // 3. 使用 setTimeout 確保 Cookie 寫入完成後再跳轉
+        // 這能有效避免 Middleware 的「規則 0」因為抓不到 Session 而將你導向登入頁
+        setTimeout(() => {
+          router.replace(safePath);
+        }, 50);
       }
     }
   }, [searchParams, currentTenant, router]);
