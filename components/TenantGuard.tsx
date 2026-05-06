@@ -62,6 +62,15 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         const sid = sessionStorage.getItem('tab_session_id');
         const sidInput = formRef.current.querySelector('input[name="sessionId"]') as HTMLInputElement;
         if (sidInput && sid) sidInput.value = sid;
+        // 🐞 Debug: 先用 sendBeacon 帶上 source 標記
+        if (sid) {
+          const blob = new Blob(
+            [JSON.stringify({ sessionId: sid, source: "TenantGuard-confirm-yes" })],
+            { type: "application/json" }
+          );
+          navigator.sendBeacon("/api/logout", blob);
+          console.log("🐞 選擇是 → sendBeacon sid:", sid);
+        }
         formRef.current.requestSubmit();
         sessionStorage.removeItem('tab_session_id'); // 清除本地狀態
         // 🐞 Debug: 確認選擇「是」後 sessionStorage 與 Cookie 狀態
@@ -103,7 +112,7 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     if (!sid) return;
 
     // 使用 sendBeacon 確保在分頁關閉的瞬間，請求能發送到 /api/logout
-    const blob = new Blob([JSON.stringify({ sessionId: sid })], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ sessionId: sid, source: "TenantGuard-beforeunload" })], { type: 'application/json' });
     navigator.sendBeacon("/api/logout", blob);
     // 🐞 Debug: 確認分頁關閉時送出的 sid
     console.log("🐞 beforeunload → sendBeacon sid:", sid);
