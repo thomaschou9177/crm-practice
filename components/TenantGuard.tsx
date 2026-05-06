@@ -92,7 +92,7 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         setTimeout(() => {
           console.log("🐞 選擇否 → 即將跳轉到:", path);
           window.location.replace(new URL(path, origin).toString());
-        }, 100);
+        }, 60000);
       }
     }
   }, [searchParams, currentTenant, router]);
