@@ -8,6 +8,8 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
   const router = useRouter();
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
+  // 用來保存 beforeunload handler 的參考，初始值設為 null
+  const handleUnloadRef = useRef<((this: Window, ev: Event) => any) | null>(null);
   // --- 邏輯 A：Session 同步核心 (解決刷新不登出) ---
   useEffect(() => {
     const syncSession = () => {
@@ -96,7 +98,11 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         }else{
           console.log("🐞 選擇否 → sid 為空，Cookie 未更新");
         }
-
+        // ✅ 跳轉前移除 beforeunload listener，避免誤觸發 logout
+        if (handleUnloadRef.current) {
+          window.removeEventListener("beforeunload", handleUnloadRef.current);
+          console.log("🐞 選擇否 → 已移除 beforeunload listener");
+        }
         // ✅ 延遲跳轉，確保 cookie 已寫入再觸發 middleware
         setTimeout(() => {
           console.log("🐞 選擇否 → 即將跳轉到:", path);
@@ -117,7 +123,8 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     // 🐞 Debug: 確認分頁關閉時送出的 sid
     console.log("🐞 beforeunload → sendBeacon sid:", sid);
   };
-
+  // 把 handler 存到 ref，方便其他地方移除
+  handleUnloadRef.current = handleUnload;
   window.addEventListener("beforeunload", handleUnload);
   return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
