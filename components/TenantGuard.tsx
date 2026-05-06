@@ -68,7 +68,7 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         const path = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
         
         // 2. 構造帶有「身分白名單」的 URL[cite: 15]
-        const safeUrl = new URL(path, origin);
+        // const safeUrl = new URL(path, origin);
         // 1. 強制執行一次 Cookie 同步，確保 Middleware 能讀到正確的 sessionId[cite: 11]
         const sid = sessionStorage.getItem('tab_session_id');
         if (sid) {
