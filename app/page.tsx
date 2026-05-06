@@ -57,7 +57,8 @@ export default function Home() {
     if (state?.success && state.sessionId) {
       // 1. 存入分頁獨立的 sessionStorage (達到刷新不登出、關閉分頁即登出)
       sessionStorage.setItem('tab_session_id', state.sessionId);
-      
+      // 🔍 驗證訊息
+      console.log("Debug: 已寫入 SessionStorage tab_session_id =", sessionStorage.getItem("tab_session_id"));
       // 2. 同步到 Cookie，讓 Middleware 能夠讀取並驗證身分
       // 不設定 maxAge，這會讓它在瀏覽器進程結束時失效 (視瀏覽器而定)
       document.cookie = `sessionId=${state.sessionId}; path=/; SameSite=Lax; ${
