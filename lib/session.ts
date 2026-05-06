@@ -32,6 +32,8 @@ const getSupabase = () => {
 export async function createSession(data: SessionData): Promise<string> {
   const supabase = getSupabase(); // 執行時才初始化
   const sessionId = crypto.randomUUID();
+  // 🐞 Debug: 印出要建立的 sid 與 payload
+  console.log("🐞 createSession → 新 sid:", sessionId, "payload:", data);
   const { error } = await supabase
     .from('sessions')
     .insert([{ id: sessionId, payload: data }]);
@@ -40,6 +42,8 @@ export async function createSession(data: SessionData): Promise<string> {
     console.error('Supabase Session Create Error:', error);
     throw new Error('無法建立 Session');
   }
+  // 🐞 Debug: 確認建立成功
+  console.log("🐞 createSession → 成功建立 sid:", sessionId);
   return sessionId;
 }
 
@@ -47,13 +51,20 @@ export async function createSession(data: SessionData): Promise<string> {
 export async function getSession(sessionId: string): Promise<SessionData | null> {
   const supabase = getSupabase(); // 執行時才初始化
   try{
+    // 🐞 Debug: 印出查詢 sid
+    console.log("🐞 getSession → 查詢 sid:", sessionId);
     const { data, error } = await supabase
       .from('sessions')
-      .select('payload')
+      .select('id,payload')
       .eq('id', sessionId)
       .single();
 
-    if (error || !data) return null;
+    // 🐞 Debug: 印出查詢結果
+    console.log("🐞 getSession → 查詢結果 data:", data, "error:", error);
+    if (error || !data) {
+      console.warn("🐞 getSession → 查不到 sid:", sessionId);
+      return null;
+    }
     return data.payload as SessionData;
   }catch(error){
     // 捕捉可能的異常（例如資料表不存在或連線問題）
@@ -65,5 +76,12 @@ export async function getSession(sessionId: string): Promise<SessionData | null>
 // 刪除 session[cite: 11]
 export async function destroySession(sessionId: string): Promise<void> {
   const supabase = getSupabase(); // 執行時才初始化
-  await supabase.from('sessions').delete().eq('id', sessionId);
+  // 🐞 Debug: 印出要刪除的 sid
+  console.log("🐞 destroySession → 刪除 sid:", sessionId);
+  const { error } =await supabase.from('sessions').delete().eq('id', sessionId);
+  if (error) {
+    console.error("🐞 destroySession → 刪除失敗:", error);
+  } else {
+    console.log("🐞 destroySession → 刪除成功 sid:", sessionId);
+  }
 }
