@@ -78,7 +78,7 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         // ✅ 延遲跳轉，確保 cookie 已寫入再觸發 middleware
         setTimeout(() => {
           window.location.replace(new URL(path, origin).toString());
-        }, 50);
+        }, 100);
       }
     }
   }, [searchParams, currentTenant, router]);
