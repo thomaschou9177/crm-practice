@@ -16,7 +16,8 @@ export async function middleware(request: NextRequest) {
   const session = sessionId ? await getSession(sessionId) : null;
 
   const authTenant = session?.tenant;
-  const isLoggedIn = Boolean(session?.isLoggedIn);
+
+  // const isLoggedIn = Boolean(session?.isLoggedIn);
 
   // 自動解析 URL 第一段作為 tenant
   const segments = pathname.split('/').filter(Boolean); // e.g. "/tenant3/dashboard" → ["tenant3","dashboard"]
@@ -32,18 +33,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // --- 規則 0：未登入阻擋 ---
-  if (isDashboardArea && !isLoggedIn) {
-    // ✅ 如果 session 有 authTenant，但 targetTenant 不同，代表是「選擇否」的情境
-    if (authTenant && authTenant !== targetTenant) {
-      // 放行，讓 TenantGuard 把使用者導回原租戶 dashboard
-      return NextResponse.next();
-    }
+  if (isDashboardArea && !authTenant) {
     const origin = request.nextUrl.origin;
     const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
     return NextResponse.redirect(loginPage);
   }
   // --- 規則 1：跨租戶切換 ---
-  if (isLoggedIn && authTenant && authTenant !== targetTenant) {
+  if (authTenant && authTenant !== targetTenant) {
     // 只有在試圖存取別人的 Dashboard 或登入頁時才攔截
     if (isDashboardArea || isLoginPage) {
       const origin = request.nextUrl.origin;
@@ -57,7 +53,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // --- 規則 2：同租戶登入頁 ---
-  if (isLoginPage && isLoggedIn && authTenant === targetTenant) {
+  if (isLoginPage && authTenant === targetTenant) {
     const origin = request.nextUrl.origin;
     const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
     return NextResponse.redirect(new URL(currentDash, origin));
