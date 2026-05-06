@@ -40,8 +40,11 @@ export async function middleware(request: NextRequest) {
   }
   // --- 規則 1：跨租戶切換 ---
   if (authTenant && authTenant !== targetTenant) {
-    // 只有在試圖存取別人的 Dashboard 或登入頁時才攔截
-    if (isDashboardArea || isLoginPage) {
+    // ✅ 修改處：如果只是直接打錯租戶的 dashboard URL → 放行，讓 TenantGuard 處理「選擇否」
+    if (isDashboardArea) {
+      return NextResponse.next(); // ← 新增這行，避免「選擇否」時被踢回登入頁
+    }
+    if (isLoginPage) {
       const origin = request.nextUrl.origin;
       // 🚀 修改點：不直接遣返，而是帶參數「放行」前往目標頁面
       const url = new URL(pathname, origin);
@@ -50,8 +53,6 @@ export async function middleware(request: NextRequest) {
       url.searchParams.set('auth_tenant', authTenant);     // 使用者目前實際登入的地方
       return NextResponse.redirect(url);
     }
-    // ✅ 如果只是直接打錯租戶的 dashboard URL → 放行，讓 TenantGuard 處理「選擇否」
-    return NextResponse.next();
   }
 
   // --- 規則 2：同租戶登入頁 ---
