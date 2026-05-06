@@ -18,9 +18,13 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         // ✅ 將 ID 寫入 Cookie，讓 Middleware 可以驗證身分
         // 不設定 expires，這會使其成為 Session Cookie
         document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
+        // 🐞 Debug: 確認 Cookie 寫入後的狀態
+        console.log("🐞 Cookie after syncSession (寫入 sid):", document.cookie);
       } else {
         // 如果連 sessionStorage 都沒了，確保 Cookie 也是空的
         document.cookie = "sessionId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+        // 🐞 Debug: 確認 Cookie 清除後的狀態
+        console.log("🐞 Cookie after syncSession (清除):", document.cookie);
       }
     };
 
@@ -60,6 +64,9 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         if (sidInput && sid) sidInput.value = sid;
         formRef.current.requestSubmit();
         sessionStorage.removeItem('tab_session_id'); // 清除本地狀態
+        // 🐞 Debug: 確認選擇「是」後 sessionStorage 與 Cookie 狀態
+        console.log("🐞 選擇是 → 清除後 SessionStorage:", sessionStorage.getItem("tab_session_id"));
+        console.log("🐞 選擇是 → Cookie 狀態:", document.cookie);
       } else {
         // --- 選擇「否」：維持原畫面邏輯 ---
         // 1. 決定回歸路徑
@@ -71,12 +78,19 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         // const safeUrl = new URL(path, origin);
         // 1. 強制執行一次 Cookie 同步，確保 Middleware 能讀到正確的 sessionId[cite: 11]
         const sid = sessionStorage.getItem('tab_session_id');
+        // 🐞 Debug: 確認選擇「否」時 sessionStorage 值
+        console.log("🐞 選擇否 → SessionStorage sid:", sid);
         if (sid) {
           document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
+          // 🐞 Debug: 確認選擇「否」時 Cookie 寫入狀態
+          console.log("🐞 選擇否 → Cookie after set:", document.cookie);
+        }else{
+          console.log("🐞 選擇否 → sid 為空，Cookie 未更新");
         }
 
         // ✅ 延遲跳轉，確保 cookie 已寫入再觸發 middleware
         setTimeout(() => {
+          console.log("🐞 選擇否 → 即將跳轉到:", path);
           window.location.replace(new URL(path, origin).toString());
         }, 100);
       }
@@ -91,6 +105,8 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     // 使用 sendBeacon 確保在分頁關閉的瞬間，請求能發送到 /api/logout
     const blob = new Blob([JSON.stringify({ sessionId: sid })], { type: 'application/json' });
     navigator.sendBeacon("/api/logout", blob);
+    // 🐞 Debug: 確認分頁關閉時送出的 sid
+    console.log("🐞 beforeunload → sendBeacon sid:", sid);
   };
 
   window.addEventListener("beforeunload", handleUnload);
