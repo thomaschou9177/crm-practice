@@ -64,7 +64,12 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         // --- 選擇「否」：維持原畫面邏輯 ---
         // 1. 決定回歸路徑
         const originalTenant = authTenant || currentTenant;
-        const safePath = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
+        const origin = window.location.origin;
+        const path = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
+        
+        // 2. 構造帶有「身分白名單」的 URL[cite: 15]
+        const safeUrl = new URL(path, origin);
+        safeUrl.searchParams.set('auth_tenant', originalTenant);
         
         // 1. 強制執行一次 Cookie 同步，確保 Middleware 能讀到正確的 sessionId[cite: 11]
         const sid = sessionStorage.getItem('tab_session_id');
@@ -72,13 +77,8 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
           document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
         }
 
-        // 2. 使用 router.replace 替代 push
-        // replace 不會增加瀏覽紀錄，且能更乾淨地移除網址上的 pending_switch 參數
-        // 3. 使用 setTimeout 確保 Cookie 寫入完成後再跳轉
-        // 這能有效避免 Middleware 的「規則 0」因為抓不到 Session 而將你導向登入頁
-        setTimeout(() => {
-          router.replace(safePath);
-        }, 50);
+        // 4. 使用原生 replace 跳轉，強制重新觸發具備正確 Cookie 的請求[cite: 16]
+        window.location.replace(safeUrl.toString());
       }
     }
   }, [searchParams, currentTenant, router]);
