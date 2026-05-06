@@ -397,7 +397,7 @@ for (const key of allDynamicKeys) {
 <div className="flex justify-center items-center gap-2 mt-6 mb-10">
   {/* 第一頁 */}
   <a 
-    href="/${tenant}/dashboard?page=1" 
+    href={`/${tenant}/dashboard?page=1`} 
     className={`px-3 py-1 border-2 border-slate-800 rounded font-bold text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-slate-100 active:translate-y-0.5 ${currentPage === 1 ? 'bg-slate-200 pointer-events-none' : 'bg-white'}`}
   >
     FIRST
