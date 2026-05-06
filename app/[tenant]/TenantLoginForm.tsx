@@ -1,7 +1,7 @@
 // app/[tenant]/TenantLoginForm.tsx
 "use client";
 
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect } from "react"; // ✅ 引入 useActionState
 import { loginTenant } from "./dashboard/actions"; // ✅ 確保路徑正確
 
