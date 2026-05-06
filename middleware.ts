@@ -42,11 +42,11 @@ export async function middleware(request: NextRequest) {
     // 只有在試圖存取別人的 Dashboard 或登入頁時才攔截
     if (isDashboardArea || isLoginPage) {
       const origin = request.nextUrl.origin;
-      const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
-      const url = new URL(currentDash, origin);
-      // ✅ 修正：傳遞布林值或簡單標記，避免將整個 pathname 編碼進去造成混亂
+      // 🚀 修改點：不直接遣返，而是帶參數「放行」前往目標頁面
+      const url = new URL(pathname, origin);
       url.searchParams.set('pending_switch', 'true');
-      url.searchParams.set('target_tenant', targetTenant);
+      url.searchParams.set('target_tenant', targetTenant); // 使用者想去的地方
+      url.searchParams.set('auth_tenant', authTenant);     // 使用者目前實際登入的地方
       return NextResponse.redirect(url);
     }
   }
