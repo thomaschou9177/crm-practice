@@ -8,8 +8,10 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
   const router = useRouter();
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
-  // 用來保存 beforeunload handler 的參考，初始值設為 null
-  const handleUnloadRef = useRef<((this: Window, ev: Event) => any) | null>(null);
+
+  // ✅ 新增：用來標記是否為「正常的內部跳轉」，避免觸發登出
+  const isNavigatingRef = useRef(false);
+
   // --- 邏輯 A：Session 同步核心 (解決刷新不登出) ---
   useEffect(() => {
     const syncSession = () => {
@@ -42,91 +44,73 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       window.removeEventListener('visibilitychange', syncSession);
       }
     }, []);
-  // --- 邏輯 B：原有的租戶切換監控 ---
+  // --- 邏輯 B：租戶切換監控 (包含選擇「否」的回航邏輯) ---
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // 防止在錯誤頁或跨來源 context 執行
-    const href = window.location.href;
-    if (!href.startsWith(window.location.origin)) return;
-
     const pendingSwitch = searchParams.get("pending_switch");
     const targetTenant = searchParams.get("target_tenant");
-    // ✅ 新增：從 Middleware 傳過來的參數讀取使用者「真正」登入的租戶
     const authTenant = searchParams.get("auth_tenant");
 
     if (pendingSwitch && targetTenant) {
       const confirmed = window.confirm(
-        `您目前已登入 ${authTenant}，是否要登出並切換至 ${targetTenant}? (此操作將登出目前帳號)`
+        `您目前已登入 ${authTenant || currentTenant}，是否要登出並切換至 ${targetTenant}? (此操作將登出目前帳號)`
       );
+
       if (confirmed && formRef.current) {
-        // 登出前，手動把 sessionStorage 的 ID 填入隱藏欄位
+        // --- 選擇「是」：執行登出切換 ---
+        isNavigatingRef.current = true; // 標記為導航中，避免觸發自動登出
+        
         const sid = sessionStorage.getItem('tab_session_id');
         const sidInput = formRef.current.querySelector('input[name="sessionId"]') as HTMLInputElement;
         if (sidInput && sid) sidInput.value = sid;
-        // 🐞 Debug: 先用 sendBeacon 帶上 source 標記
-        if (sid) {
-          const blob = new Blob(
-            [JSON.stringify({ sessionId: sid, source: "TenantGuard-confirm-yes" })],
-            { type: "application/json" }
-          );
-          navigator.sendBeacon("/api/logout", blob);
-          console.log("🐞 選擇是 → sendBeacon sid:", sid);
-        }
+        
         formRef.current.requestSubmit();
-        sessionStorage.removeItem('tab_session_id'); // 清除本地狀態
-        // 🐞 Debug: 確認選擇「是」後 sessionStorage 與 Cookie 狀態
-        console.log("🐞 選擇是 → 清除後 SessionStorage:", sessionStorage.getItem("tab_session_id"));
-        console.log("🐞 選擇是 → Cookie 狀態:", document.cookie);
+        sessionStorage.removeItem('tab_session_id'); 
       } else {
         // --- 選擇「否」：維持原畫面邏輯 ---
-        // 1. 決定回歸路徑
         const originalTenant = authTenant || currentTenant;
         const origin = window.location.origin;
         const path = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
         
-        // 2. 構造帶有「身分白名單」的 URL[cite: 15]
-        // const safeUrl = new URL(path, origin);
-        // 1. 強制執行一次 Cookie 同步，確保 Middleware 能讀到正確的 sessionId[cite: 11]
+        // 1. 標記現在是「安全跳轉」，不要執行邏輯 C 的登出
+        isNavigatingRef.current = true;
+
+        // 2. 強制寫入一次 Cookie，確保 Middleware 抓得到
         const sid = sessionStorage.getItem('tab_session_id');
-        // 🐞 Debug: 確認選擇「否」時 sessionStorage 值
-        console.log("🐞 選擇否 → SessionStorage sid:", sid);
         if (sid) {
           document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
-          // 🐞 Debug: 確認選擇「否」時 Cookie 寫入狀態
-          console.log("🐞 選擇否 → Cookie after set:", document.cookie);
-        }else{
-          console.log("🐞 選擇否 → sid 為空，Cookie 未更新");
         }
-        // ✅ 跳轉前移除 beforeunload listener，避免誤觸發 logout
-        if (handleUnloadRef.current) {
-          window.removeEventListener("beforeunload", handleUnloadRef.current);
-          console.log("🐞 選擇否 → 已移除 beforeunload listener");
-        }
-        // ✅ 延遲跳轉，確保 cookie 已寫入再觸發 middleware
+
+        // 3. 構造帶有 auth_tenant 參數的 URL，觸發 Middleware 的白名單放行
+        const safeUrl = new URL(path, origin);
+        safeUrl.searchParams.set('auth_tenant', originalTenant);
+
+        // 4. 使用原生 replace 跳轉，徹底消除舊的 pending_switch 參數並強制刷新身分
         setTimeout(() => {
-          console.log("🐞 選擇否 → 即將跳轉到:", path);
-          window.location.replace(new URL(path, origin).toString());
-        }, 60000);
+          window.location.replace(safeUrl.toString());
+        }, 50);
       }
     }
-  }, [searchParams, currentTenant, router]);
-  // --- 邏輯 C：新增的分頁關閉自動登出 ---
-  useEffect(() => {
-  const handleUnload = () => {
-    const sid = sessionStorage.getItem('tab_session_id');
-    if (!sid) return;
+  }, [searchParams, currentTenant]);
 
-    // 使用 sendBeacon 確保在分頁關閉的瞬間，請求能發送到 /api/logout
-    const blob = new Blob([JSON.stringify({ sessionId: sid, source: "TenantGuard-beforeunload" })], { type: 'application/json' });
-    navigator.sendBeacon("/api/logout", blob);
-    // 🐞 Debug: 確認分頁關閉時送出的 sid
-    console.log("🐞 beforeunload → sendBeacon sid:", sid);
-  };
-  // 把 handler 存到 ref，方便其他地方移除
-  handleUnloadRef.current = handleUnload;
-  window.addEventListener("beforeunload", handleUnload);
-  return () => window.removeEventListener("beforeunload", handleUnload);
+  // --- 邏輯 C：新增的分頁關閉自動登出 (防止跳轉時誤觸發) ---
+  useEffect(() => {
+    const handleUnload = () => {
+      // 🚀 核心修正：如果是因為邏輯 B 的跳轉引發的卸載，則不執行登出
+      if (isNavigatingRef.current) {
+        return;
+      }
+
+      const sid = sessionStorage.getItem('tab_session_id');
+      if (!sid) return;
+
+      const blob = new Blob([JSON.stringify({ sessionId: sid, source: "close-tab" })], { type: 'application/json' });
+      navigator.sendBeacon("/api/logout", blob);
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
   
   return (
