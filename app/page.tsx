@@ -2,7 +2,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation'; // Import the router
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { loginPublic } from './dashboard/actions';
 
 const translations = {
@@ -52,24 +52,22 @@ export default function Home() {
   const [error, setError] = useState('');
   const [state, formAction, isPending] = useActionState(loginPublic, null);
   const t = translations[lang];
-  // const handleSubmit = (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   setError('');
+  // ✅ 新增：監聽登入結果
+  useEffect(() => {
+    if (state?.success && state.sessionId) {
+      // 1. 存入分頁獨立的 sessionStorage (達到刷新不登出、關閉分頁即登出)
+      sessionStorage.setItem('tab_session_id', state.sessionId);
+      
+      // 2. 同步到 Cookie，讓 Middleware 能夠讀取並驗證身分
+      // 不設定 maxAge，這會讓它在瀏覽器進程結束時失效 (視瀏覽器而定)
+      document.cookie = `sessionId=${state.sessionId}; path=/; SameSite=Lax; ${
+        window.location.protocol === 'https:' ? 'Secure' : ''
+      }`;
 
-  //   // Check if the input matches any of our 3 sets
-  //   const user = VALID_USERS.find(
-  //     (u) => u.username === username && u.password === password
-  //   );
-
-  //   if (user) {
-  //     alert(`${t.success}${user.username}`);
-  //     router.push('/dashboard')
-  //     // In a real app, you would use 'next/navigation' to redirect here
-  //     // router.push('/dashboard'); 
-  //   } else {
-  //     setError(t.error);
-  //   }
-  // };
+      // 3. 執行跳轉
+      router.push(state.redirectTo || '/dashboard');
+    }
+  }, [state, router]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-6">

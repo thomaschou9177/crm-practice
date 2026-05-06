@@ -1,13 +1,30 @@
 // app/[tenant]/TenantLoginForm.tsx
 "use client";
 
-import { useActionState } from "react"; // ✅ 引入 useActionState
+import { useRouter } from "next/router";
+import { useActionState, useEffect } from "react"; // ✅ 引入 useActionState
 import { loginTenant } from "./dashboard/actions"; // ✅ 確保路徑正確
 
 export default function TenantLoginForm({ tenant }: { tenant: string }) {
   // ✅ 使用 useActionState 綁定 Action
   // state 將接收來自 loginTenant 回傳的 { error: "..." }
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState(loginTenant, null);
+  // ✅ 新增：處理分頁獨立 Session 邏輯
+  useEffect(() => {
+    if (state?.success && state.sessionId) {
+      // 1. 存入該分頁特有的 sessionStorage
+      sessionStorage.setItem('tab_session_id', state.sessionId);
+      
+      // 2. 同步到 Cookie 供 Middleware 驗證 (Session Cookie 模式)
+      document.cookie = `sessionId=${state.sessionId}; path=/; SameSite=Lax; ${
+        window.location.protocol === 'https:' ? 'Secure' : ''
+      }`;
+
+      // 3. 導向該租戶的 Dashboard
+      router.push(state.redirectTo || `/${tenant}/dashboard`);
+    }
+  }, [state, tenant, router]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-100">

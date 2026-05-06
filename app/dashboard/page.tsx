@@ -178,9 +178,17 @@ for (const key of allDynamicKeys) {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
-          <form action={handleLogout}>
+          <form action={handleLogout} id="logout-form">
             <input type="hidden" name="tenant" value="public" />
-            <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">
+            <input type="hidden" name="sessionId" id="logout-session-id" value="" />
+            <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm"
+              onClick={() => {
+              // 在送出前從 sessionStorage 抓取正確的 ID
+              const sid = sessionStorage.getItem('tab_session_id');
+              const input = document.getElementById('logout-session-id') as HTMLInputElement;
+              if (input && sid) input.value = sid;
+              }}
+            >
               Logout
             </button>
           </form>

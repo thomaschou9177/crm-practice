@@ -10,22 +10,18 @@ import { redirect } from 'next/navigation';
 
   export async function handleLogout(formData: FormData) {
   const tenant = formData.get('tenant')?.toString() || 'public';
-  const targetTenant = formData.get('target_tenant')?.toString();
+  // ✅ 從表單獲取隱藏的 sessionId
+  const sessionId = formData.get('sessionId')?.toString(); 
 
   const cookieStore = await cookies();
-  const sessionId = cookieStore.get('sessionId')?.value;
-
-  // ✅ 1. 呼叫 destroySession 確保資料庫紀錄被刪除[cite: 11]
+  
   if (sessionId) {
-    await destroySession(sessionId);
+    await destroySession(sessionId); // 刪除資料庫紀錄[cite: 12]
   }
 
   // ✅ 2. 清除 Cookie
   cookieStore.delete('sessionId');
 
-  if (targetTenant) {
-    redirect(targetTenant === 'public' ? '/' : `/${targetTenant}`);
-  }
   redirect(tenant === 'public' ? '/' : `/${tenant}`);
 }
 
@@ -221,22 +217,12 @@ const TENANT_USERS: Record<string, { username: string; password: string }[]> = {
       isLoggedIn: true,
       user: { name: user.username }
     });
-    // ✅ 2. 驗證成功，直接建立 Session (不使用 fetch)
-    const cookieStore = await cookies();
-    
-    // 如果你有後端 session store (例如 lib/session.ts)，在這裡建立
-    // const sessionId = createSession({ tenant, user: username }); 
-    // ✅ 3. 設定 Session Cookie
-    cookieStore.set('sessionId', sessionId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      // ⚠️ 不設 maxAge，達成關閉瀏覽器即失效
-    });
-
-    // 導向該 tenant 的 dashboard
-    redirect(tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard`);
+    return { 
+      success: true, 
+      sessionId, 
+      tenant,
+      redirectTo: tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard` 
+    };
   } else {
     // 驗證失敗
     // ✅ 失敗時不 redirect，直接回傳錯誤訊息給前端

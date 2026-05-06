@@ -205,9 +205,17 @@ for (const key of allDynamicKeys) {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold uppercase tracking-tighter">Excel-Style CRM</h1>
-          <form action={handleLogout}>
+          <form action={handleLogout} onSubmit={(e) => {
+              const sid = sessionStorage.getItem('tab_session_id');
+              if (sid) {
+                const input = e.currentTarget.querySelector('input[name="sessionId"]') as HTMLInputElement;
+                input.value = sid;
+              }
+            }}
+          >
             <input type="hidden" name="tenant" value={tenant} />
-            <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm">
+            <input type="hidden" name="sessionId" value="" />
+            <button type="submit" className="bg-white border px-4 py-2 rounded font-bold shadow-sm hover:bg-red-50">
               Logout
             </button>
           </form>

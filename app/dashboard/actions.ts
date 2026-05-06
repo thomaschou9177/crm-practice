@@ -195,40 +195,16 @@ import { redirect } from 'next/navigation';
       isLoggedIn: true,
       user: { name: user.username }
     });
-    // ✅ 2. 直接操作 Cookie，不要 fetch /api/login (避免 URL 解析錯誤)
-    const cookieStore = await cookies();
-    
-    // 設定 Session Cookie (不給 maxAge，分頁關閉時瀏覽器會視情況清理)
-    cookieStore.set('sessionId', sessionId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
-
-    redirect('/dashboard');
+    // ✅ 2.我們改為回傳結果給前端，讓前端處理 sessionStorage 與同步
+    return { 
+      success: true, 
+      sessionId, 
+      tenant: 'public',
+      redirectTo: '/dashboard' 
+    };
   } else {
     // 驗證失敗
     // ✅ 失敗時不 redirect，直接回傳錯誤訊息給前端
     return { error: "帳號或密碼錯誤，請重新輸入。" };
   }
-
-  // // ✅ 呼叫 /api/login，由 API 建立 session 並設定 sessionId cookie
-  // const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/login`, {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   body: JSON.stringify({
-  //     username,
-  //     password,
-  //     tenant: 'public', // 固定 public schema
-  //   }),
-  // });
-
-  // if (res.ok) {
-  //   // 登入成功 → 導向 public dashboard
-  //   redirect('/dashboard');
-  // } else {
-  //   // 登入失敗 → 導回登入頁
-  //   redirect('/');
-  //   }
   }
