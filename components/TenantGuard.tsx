@@ -13,7 +13,7 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     const syncSession = () => {
       // 從分頁獨立的存儲空間抓取 ID
       const sid = sessionStorage.getItem('tab_session_id');
-      
+      console.log("🔍 TenantGuard 檢查 SessionStorage:", sid);
       if (sid) {
         // ✅ 將 ID 寫入 Cookie，讓 Middleware 可以驗證身分
         // 不設定 expires，這會使其成為 Session Cookie
