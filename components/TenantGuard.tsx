@@ -89,7 +89,7 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
 
         // 4. 立即跳轉
         console.log("🐞 正在安全跳轉，已設置 skip_logout");
-        window.location.replace(safeUrl.toString());
+        router.replace(safeUrl.pathname + safeUrl.search);
       }
     }
   }, [searchParams, currentTenant]);
