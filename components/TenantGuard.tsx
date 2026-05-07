@@ -73,8 +73,9 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         const origin = window.location.origin;
         const path = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
         
-        // 1. 標記現在是「安全跳轉」，不要執行邏輯 C 的登出
+        // 1. 設置雙重標記：Ref 用於同步攔截，sessionStorage 用於跨頁面持久化
         isNavigatingRef.current = true;
+        sessionStorage.setItem('skip_logout', 'true');
 
         // 2. 強制寫入一次 Cookie，確保 Middleware 抓得到
         const sid = sessionStorage.getItem('tab_session_id');
@@ -83,29 +84,37 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         }
 
         // 3. 構造帶有 auth_tenant 參數的 URL，觸發 Middleware 的白名單放行
-        const safeUrl = new URL(path, origin);
-        safeUrl.searchParams.set('auth_tenant', originalTenant);
+        const safeUrl = new URL(path, window.location.origin);
+        safeUrl.searchParams.set('auth_tenant', originalTenant as string);
 
-        // 4. 使用原生 replace 跳轉，徹底消除舊的 pending_switch 參數並強制刷新身分
-        setTimeout(() => {
-          window.location.replace(safeUrl.toString());
-        }, 50);
+        // 4. 立即跳轉
+        console.log("🐞 正在安全跳轉，已設置 skip_logout");
+        window.location.replace(safeUrl.toString());
       }
     }
   }, [searchParams, currentTenant]);
 
   // --- 邏輯 C：新增的分頁關閉自動登出 (防止跳轉時誤觸發) ---
   useEffect(() => {
+    // 進入頁面後，立即清除跳轉標記，確保下一次關閉分頁能正常登出
+    sessionStorage.removeItem('skip_logout');
     const handleUnload = () => {
-      // 🚀 核心修正：如果是因為邏輯 B 的跳轉引發的卸載，則不執行登出
-      if (isNavigatingRef.current) {
+      // 🚀 關鍵判斷：如果 Ref 為 true 或 sessionStorage 有標記，則攔截登出
+      const isSkipping = isNavigatingRef.current || sessionStorage.getItem('skip_logout') === 'true';
+      
+      if (isSkipping) {
+        console.log("🐞 偵測到安全跳轉標記，攔截 /api/logout 請求");
         return;
       }
 
       const sid = sessionStorage.getItem('tab_session_id');
       if (!sid) return;
 
-      const blob = new Blob([JSON.stringify({ sessionId: sid, source: "close-tab" })], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify({ 
+        sessionId: sid, 
+        source: "close-tab" 
+      })], { type: 'application/json' });
+      
       navigator.sendBeacon("/api/logout", blob);
     };
 
