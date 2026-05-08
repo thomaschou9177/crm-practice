@@ -63,16 +63,19 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         sessionStorage.removeItem('tab_session_id');
       } else {
         // --- 選擇「否」：回歸原位 ---
-        // 🚀 [修改] 1. 決定安全回歸路徑
+        // 🚀 [修改] 0. 決定安全回歸路徑
         const originalTenant = authTenant || currentTenant;
         const path = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
         
-        // 🚀 [修改] 2. 設定標記，告訴 beforeunload 不要執行 API 登出
+        // 🚀 [修改] 1. 設定標記，告訴 beforeunload 不要執行 API 登出
         isNavigatingRef.current = true;
         sessionStorage.setItem('skip_logout', 'true');
 
-        // 🚀 [修改] 3. 執行跳轉 (帶著 auth_tenant 參數讓 Middleware 知道是安全回歸)
-        router.replace(`${path}?auth_tenant=${originalTenant}`);
+        // 2. ✅ [關鍵] 設定一個極短效的 Cookie 讓 Middleware 放行一次，避免 URL 出現 auth_tenant
+        document.cookie = "temp_bypass=true; path=/; max-age=10";
+
+        // 🚀 [修改] 3. 跳轉回乾淨的路徑
+        router.replace(path);
       }
     }
   }, [searchParams, currentTenant,router]);

@@ -24,6 +24,9 @@ export async function middleware(request: NextRequest) {
   console.log("🐞 middleware 判斷 authTenant:", authTenant);
   // const isLoggedIn = Boolean(session?.isLoggedIn);
 
+  // 🚀 [修正] 讀取前端埋下的暫時放行標記
+  const hasTempBypass = request.cookies.has('temp_bypass');
+
   // 自動解析 URL 第一段作為 tenant
   const segments = pathname.split('/').filter(Boolean); // e.g. "/tenant3/dashboard" → ["tenant3","dashboard"]
   let targetTenant = segments[0] || 'public';
@@ -42,11 +45,12 @@ export async function middleware(request: NextRequest) {
 
   // --- 規則 0：未登入阻擋 ---
   if (isDashboardArea && !authTenant) {
-    // ✅ 修正點 3：如果 URL 帶著 auth_tenant，代表是從「選否」跳回來的
-    // 此時 Session 其實還在（因為被 TenantGuard 攔截了），但 Cookie 可能還在同步中
-    // 我們讓它 pass，交給客戶端的 TenantGuard 重新同步 Cookie
-    if (searchParams.has('auth_tenant')) {
-      return NextResponse.next();
+    // 🚀 [修正] 如果有 temp_bypass 標記，視為安全回歸，予以放行
+    if (hasTempBypass) {
+      const response = NextResponse.next();
+      // 使用完畢立即清除，確保安全性
+      response.cookies.delete('temp_bypass');
+      return response;
     }
     console.log("🐞 middleware 規則0 → 未登入阻擋, redirect 到登入頁");
     const origin = request.nextUrl.origin;
