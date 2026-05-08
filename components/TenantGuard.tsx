@@ -19,6 +19,13 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       const sid = sessionStorage.getItem('tab_session_id');
       console.log("🔍 TenantGuard 檢查 SessionStorage:", sid);
       if (sid) {
+        // 🚀 [修改]：同步時檢查是否有 retry 參數，有的話代表是從 Middleware 重導向回來的修復路徑
+        if (searchParams.get('retry')) {
+          const newParams = new URLSearchParams(searchParams.toString());
+          newParams.delete('retry');
+          const cleanPath = window.location.pathname + (newParams.toString() ? `?${newParams.toString()}` : '');
+          window.history.replaceState(null, '', cleanPath);
+        }
         // ✅ 將 ID 寫入 Cookie，讓 Middleware 可以驗證身分
         // 不設定 expires，這會使其成為 Session Cookie
         document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
@@ -82,15 +89,15 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
 
   // --- 邏輯 C：新增的分頁關閉自動登出 (防止跳轉時誤觸發) ---
   useEffect(() => {
-    // 進入頁面後，立即清除跳轉標記，確保下一次關閉分頁能正常登出
-    sessionStorage.removeItem('skip_logout');
+    // 每次進入/重新整理頁面，確保標記在完成載入後會被清理
+    const cleanup = setTimeout(() => {
+      sessionStorage.removeItem('skip_logout');
+    }, 1000);
     const handleUnload = () => {
       // 🚀 [修改] 檢查是否為「刷新行為」
-      // Navigation Type 1 代表 Reload
-      const isReloading = window.performance
-        .getEntriesByType('navigation')
-        .map((nav) => (nav as PerformanceNavigationTiming).type)
-        .includes('reload');
+      // 🚀 [修改]：更精確的刷新行為偵測
+      const navEntries = window.performance.getEntriesByType('navigation');
+      const isReloading = navEntries.length > 0 && (navEntries[0] as PerformanceNavigationTiming).type === 'reload';
 
       // 🚀 [修改] 判斷是否應該跳過登出：(Ref 標記 OR 刷新行為 OR sessionStorage 標記)
       const isSkipping = 
@@ -110,7 +117,10 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     };
 
     window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
+    return () => {
+      clearTimeout(cleanup);
+      window.removeEventListener("beforeunload", handleUnload);
+    }
   }, []);
   
   // 🚀 [修改] 當路徑變動完成後，重置 Ref 標記

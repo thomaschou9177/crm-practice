@@ -53,6 +53,15 @@ export async function middleware(request: NextRequest) {
       return response;
     }
     console.log("🐞 middleware 規則0 → 未登入阻擋, redirect 到登入頁");
+    // ✅ 修正點 2：針對「連續刷新」的防護
+    // 如果 URL 沒帶這參數，我們先嘗試原地刷新一次，不直接踢走
+    // 這給了 TenantGuard 在客戶端把 sessionStorage 補回 Cookie 的時間
+    if (!searchParams.has('retry')) {
+      const retryUrl = new URL(request.url);
+      retryUrl.searchParams.set('retry', '1');
+      return NextResponse.redirect(retryUrl);
+    }
+    // 如果連重試一次都沒 Session，才真的踢回登入頁
     const origin = request.nextUrl.origin;
     const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
     return NextResponse.redirect(loginPage);
