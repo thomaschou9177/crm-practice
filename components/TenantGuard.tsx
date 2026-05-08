@@ -9,7 +9,7 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
 
-  // ✅ 新增：用來標記是否為「正常的內部跳轉」，避免觸發登出
+  // 🚀 [修改] 新增：用來標記是否為「受控的內部跳轉」，避免觸發 beforeunload 登出
   const isNavigatingRef = useRef(false);
 
   // --- 邏輯 A：Session 同步核心 (解決刷新不登出) ---
@@ -46,75 +46,63 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     }, []);
   // --- 邏輯 B：租戶切換監控 (包含選擇「否」的回航邏輯) ---
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const pendingSwitch = searchParams.get("pending_switch");
-    const targetTenant = searchParams.get("target_tenant");
-    const authTenant = searchParams.get("auth_tenant");
-
-    if (pendingSwitch && targetTenant) {
+    const pendingSwitch = searchParams.get('pending_switch');
+    if (pendingSwitch === 'true') {
+      const targetTenant = searchParams.get('target_tenant');
+      const authTenant = searchParams.get('auth_tenant');
+      
       const confirmed = window.confirm(
-        `您目前已登入 ${authTenant || currentTenant}，是否要登出並切換至 ${targetTenant}? (此操作將登出目前帳號)`
+        `您目前登入於 ${authTenant}，是否切換至 ${targetTenant}? (此操作將登出目前帳號)`
       );
 
       if (confirmed && formRef.current) {
-        // --- 選擇「是」：執行登出切換 ---
-        isNavigatingRef.current = true; // 標記為導航中，避免觸發自動登出
-        
         const sid = sessionStorage.getItem('tab_session_id');
         const sidInput = formRef.current.querySelector('input[name="sessionId"]') as HTMLInputElement;
         if (sidInput && sid) sidInput.value = sid;
-        
         formRef.current.requestSubmit();
-        sessionStorage.removeItem('tab_session_id'); 
+        sessionStorage.removeItem('tab_session_id');
       } else {
-        // --- 選擇「否」：維持原畫面邏輯 ---
+        // --- 選擇「否」：回歸原位 ---
+        // 🚀 [修改] 1. 決定安全回歸路徑
         const originalTenant = authTenant || currentTenant;
-        const origin = window.location.origin;
         const path = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
         
-        // 1. 設置雙重標記：Ref 用於同步攔截，sessionStorage 用於跨頁面持久化
+        // 🚀 [修改] 2. 設定標記，告訴 beforeunload 不要執行 API 登出
         isNavigatingRef.current = true;
         sessionStorage.setItem('skip_logout', 'true');
 
-        // 2. 強制寫入一次 Cookie，確保 Middleware 抓得到
-        const sid = sessionStorage.getItem('tab_session_id');
-        if (sid) {
-          document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
-        }
-
-        // 3. 構造帶有 auth_tenant 參數的 URL，觸發 Middleware 的白名單放行
-        const safeUrl = new URL(path, window.location.origin);
-        safeUrl.searchParams.set('auth_tenant', originalTenant as string);
-
-        // 4. 立即跳轉
-        console.log("🐞 正在安全跳轉，已設置 skip_logout");
-        router.replace(safeUrl.pathname + safeUrl.search);
+        // 🚀 [修改] 3. 執行跳轉 (帶著 auth_tenant 參數讓 Middleware 知道是安全回歸)
+        router.replace(`${path}?auth_tenant=${originalTenant}`);
       }
     }
-  }, [searchParams, currentTenant]);
+  }, [searchParams, currentTenant,router]);
 
   // --- 邏輯 C：新增的分頁關閉自動登出 (防止跳轉時誤觸發) ---
   useEffect(() => {
     // 進入頁面後，立即清除跳轉標記，確保下一次關閉分頁能正常登出
     sessionStorage.removeItem('skip_logout');
     const handleUnload = () => {
-      // 🚀 關鍵判斷：如果 Ref 為 true 或 sessionStorage 有標記，則攔截登出
-      const isSkipping = isNavigatingRef.current || sessionStorage.getItem('skip_logout') === 'true';
+      // 🚀 [修改] 檢查是否為「刷新行為」
+      // Navigation Type 1 代表 Reload
+      const isReloading = window.performance
+        .getEntriesByType('navigation')
+        .map((nav) => (nav as PerformanceNavigationTiming).type)
+        .includes('reload');
+
+      // 🚀 [修改] 判斷是否應該跳過登出：(Ref 標記 OR 刷新行為 OR sessionStorage 標記)
+      const isSkipping = 
+        isNavigatingRef.current || 
+        isReloading || 
+        sessionStorage.getItem('skip_logout') === 'true';
       
       if (isSkipping) {
-        console.log("🐞 偵測到安全跳轉標記，攔截 /api/logout 請求");
-        return;
+        return; 
       }
 
       const sid = sessionStorage.getItem('tab_session_id');
       if (!sid) return;
 
-      const blob = new Blob([JSON.stringify({ 
-        sessionId: sid, 
-        source: "close-tab" 
-      })], { type: 'application/json' });
-      
+      const blob = new Blob([JSON.stringify({ sessionId: sid, source: "close-tab" })], { type: 'application/json' });
       navigator.sendBeacon("/api/logout", blob);
     };
 
@@ -122,6 +110,11 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
   
+  // 🚀 [修改] 當路徑變動完成後，重置 Ref 標記
+  useEffect(() => {
+    isNavigatingRef.current = false;
+  }, [searchParams]);
+
   return (
     <form ref={formRef} action={handleLogout} style={{ display: "none" }}>
       <input type="hidden" name="tenant" value={currentTenant} />

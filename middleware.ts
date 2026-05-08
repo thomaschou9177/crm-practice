@@ -42,6 +42,12 @@ export async function middleware(request: NextRequest) {
 
   // --- 規則 0：未登入阻擋 ---
   if (isDashboardArea && !authTenant) {
+    // ✅ 修正點 3：如果 URL 帶著 auth_tenant，代表是從「選否」跳回來的
+    // 此時 Session 其實還在（因為被 TenantGuard 攔截了），但 Cookie 可能還在同步中
+    // 我們讓它 pass，交給客戶端的 TenantGuard 重新同步 Cookie
+    if (searchParams.has('auth_tenant')) {
+      return NextResponse.next();
+    }
     console.log("🐞 middleware 規則0 → 未登入阻擋, redirect 到登入頁");
     const origin = request.nextUrl.origin;
     const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
