@@ -116,10 +116,18 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
 
   // --- 邏輯 C：新增的分頁關閉自動登出 (防止跳轉時誤觸發) ---
   useEffect(() => {
-    // 🚀 [新增] 只要進入組件且沒有 pending 參數，延遲一點點就清理標記
-    const hasPending = searchParams.has('pending_switch');
+    // 1. 🚀 [關鍵：進入頁面立即檢查]
+    // 判定當前是否為「重新整理」
+    const navs = window.performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+    const isReload = navs.length > 0 && navs[0].type === 'reload';
+
+    // 如果是重新整理，我們立刻在 sessionStorage 補上標記，防止接下來可能觸發的任何異常 unload
+    if (isReload) {
+      sessionStorage.setItem('skip_logout', 'true');
+    }
     // 每次進入/重新整理頁面，確保標記在完成載入後會被清理
     const cleanup = setTimeout(() => {
+      const hasPending = searchParams.has('pending_switch');
       if (!hasPending) {
         sessionStorage.removeItem('skip_logout');
         // 🚀 [新增] 同步重置 Ref 標記
@@ -127,18 +135,19 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       }
     }, 2000);
     const handleUnload = () => {
-      // 1. 🚀 [精確偵測行為]：在 unload 瞬間判斷導航類型
-      const navEntries = window.performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
-      const navType = navEntries.length > 0 ? navEntries[0].type : '';
-      // 排除刷新 (reload) 與 瀏覽器前進後退 (back_forward)
-      const isStandardNavigation = navType === 'reload' || navType === 'back_forward';
-      // 2. 🚀 [多重標記檢查]
-      const isManualSkipping = isNavigatingRef.current === true;
-      const isStorageSkipping = sessionStorage.getItem('skip_logout') === 'true';
-      // 🚀 [修改] 判斷是否應該跳過登出：(Ref 標記 OR 刷新行為 OR sessionStorage 標記)
-      // 🐞 Debug: 如果被攔截，開發者工具可能看不到，但這能幫助邏輯判斷
-      if (isStandardNavigation || isManualSkipping || isStorageSkipping) {
-        return; // 命中任何一項保護規則，直接終止，不發送登出 API
+      // 重新抓取一次最新導航狀態
+      const currentNavs = window.performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+      const currentType = currentNavs.length > 0 ? currentNavs[0].type : '';
+      
+      // 只要是 reload、back_forward，或者我們手動下的 skip 標記，全部攔截
+      const shouldSkip = 
+        currentType === 'reload' || 
+        currentType === 'back_forward' ||
+        isNavigatingRef.current === true || 
+        sessionStorage.getItem('skip_logout') === 'true';
+
+      if (shouldSkip) {
+        return; 
       }
       //3. 執行自動登出 (僅限真正「關閉分頁」或「輸入新網址離開」)
       const sid = sessionStorage.getItem('tab_session_id');
