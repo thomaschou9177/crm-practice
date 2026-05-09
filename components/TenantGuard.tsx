@@ -19,18 +19,33 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       const sid = sessionStorage.getItem('tab_session_id');
       console.log("🔍 TenantGuard 檢查 SessionStorage:", sid);
       if (sid) {
-        // 🚀 [修改]：同步時檢查是否有 retry 參數，有的話代表是從 Middleware 重導向回來的修復路徑
-        if (searchParams.get('retry')) {
-          const newParams = new URLSearchParams(searchParams.toString());
-          newParams.delete('retry');
-          const cleanPath = window.location.pathname + (newParams.toString() ? `?${newParams.toString()}` : '');
-          window.history.replaceState(null, '', cleanPath);
-        }
+        
         // ✅ 將 ID 寫入 Cookie，讓 Middleware 可以驗證身分
         // 不設定 expires，這會使其成為 Session Cookie
         document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
         // 🐞 Debug: 確認 Cookie 寫入後的狀態
         console.log("🐞 Cookie after syncSession (寫入 sid):", document.cookie);
+        // 🚀 核心優化：檢查是否有暫時性參數需要清理
+        const params = new URLSearchParams(searchParams.toString());
+        const needsCleanup = 
+          params.has('retry') || 
+          params.has('auth_tenant') || 
+          params.has('pending_switch') ||
+          params.has('target_tenant');
+
+        if (needsCleanup) {
+          // 移除所有用於中間過程的參數
+          params.delete('retry');
+          params.delete('auth_tenant');
+          params.delete('pending_switch');
+          params.delete('target_tenant');
+
+          const newSearch = params.toString();
+          const cleanPath = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+          
+          // 使用 replaceState 修改網址，不會觸發頁面刷新，讓使用者看不到參數殘留
+          window.history.replaceState(null, '', cleanPath);
+        }
       } else {
         // 如果連 sessionStorage 都沒了，確保 Cookie 也是空的
         document.cookie = "sessionId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
@@ -41,16 +56,17 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
 
     syncSession(); // 組件掛載時立即執行
 
-    // 監聽分頁聚焦，確保多個分頁切換時，Cookie 永遠是該分頁的 ID
-    window.addEventListener('focus', syncSession);
-    window.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') syncSession();
-    });
-    return () => {
-      window.removeEventListener('focus', syncSession);
-      window.removeEventListener('visibilitychange', syncSession);
-      }
-    }, []);
+    // // 監聽分頁聚焦，確保多個分頁切換時，Cookie 永遠是該分頁的 ID
+    // window.addEventListener('focus', syncSession);
+    // window.addEventListener('visibilitychange', () => {
+    // if (document.visibilityState === 'visible') syncSession();
+    // });
+    // return () => {
+    //   window.removeEventListener('focus', syncSession);
+    //   window.removeEventListener('visibilitychange', syncSession);
+    //   }
+
+    }, [searchParams]);
   // --- 邏輯 B：租戶切換監控 (包含選擇「否」的回航邏輯) ---
   useEffect(() => {
     const pendingSwitch = searchParams.get('pending_switch');
@@ -78,20 +94,31 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         isNavigatingRef.current = true;
         sessionStorage.setItem('skip_logout', 'true');
 
-        // 2. ✅ [關鍵] 設定一個極短效的 Cookie 讓 Middleware 放行一次，避免 URL 出現 auth_tenant
-        document.cookie = "temp_bypass=true; path=/; max-age=10";
+        // // 2. ✅ [關鍵] 設定一個極短效的 Cookie 讓 Middleware 放行一次，避免 URL 出現 auth_tenant
+        // document.cookie = "temp_bypass=true; path=/; max-age=10";
+      
+        // 2. 🚀 [關鍵修改] 移除 temp_bypass Cookie。
+        // 改為在網址加上 auth_tenant 參數。
+        // Middleware 看到這個參數會放行，隨後「邏輯 A」會偵測到並自動把這個參數從網址列抹除。
+        const returnUrl = new URL(path, window.location.origin);
+        returnUrl.searchParams.set('auth_tenant', originalTenant as string);
 
-        // 🚀 [修改] 3. 跳轉回乾淨的路徑
-        router.replace(path);
+        // 3. 執行跳轉
+        // 使用 window.location.replace 確保環境乾淨重新觸發 Middleware 判定
+        setTimeout(() => {
+          window.location.replace(returnUrl.toString());
+        }, 50);
       }
     }
-  }, [searchParams, currentTenant,router]);
+  }, [searchParams, currentTenant]);
 
   // --- 邏輯 C：新增的分頁關閉自動登出 (防止跳轉時誤觸發) ---
   useEffect(() => {
     // 每次進入/重新整理頁面，確保標記在完成載入後會被清理
     const cleanup = setTimeout(() => {
       sessionStorage.removeItem('skip_logout');
+      // 🚀 [新增] 同步重置 Ref 標記
+      isNavigatingRef.current = false;
     }, 1000);
     const handleUnload = () => {
       // 🚀 [修改] 檢查是否為「刷新行為」
@@ -121,7 +148,7 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       clearTimeout(cleanup);
       window.removeEventListener("beforeunload", handleUnload);
     }
-  }, []);
+  }, [searchParams]);
   
   // 🚀 [修改] 當路徑變動完成後，重置 Ref 標記
   useEffect(() => {

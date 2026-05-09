@@ -24,8 +24,8 @@ export async function middleware(request: NextRequest) {
   console.log("🐞 middleware 判斷 authTenant:", authTenant);
   // const isLoggedIn = Boolean(session?.isLoggedIn);
 
-  // 🚀 [修正] 讀取前端埋下的暫時放行標記
-  const hasTempBypass = request.cookies.has('temp_bypass');
+  // // 🚀 [修正] 讀取前端埋下的暫時放行標記
+  // const hasTempBypass = request.cookies.has('temp_bypass');
 
   // 自動解析 URL 第一段作為 tenant
   const segments = pathname.split('/').filter(Boolean); // e.g. "/tenant3/dashboard" → ["tenant3","dashboard"]
@@ -45,13 +45,20 @@ export async function middleware(request: NextRequest) {
 
   // --- 規則 0：未登入阻擋 ---
   if (isDashboardArea && !authTenant) {
-    // 🚀 [修正] 如果有 temp_bypass 標記，視為安全回歸，予以放行
-    if (hasTempBypass) {
-      const response = NextResponse.next();
-      // 使用完畢立即清除，確保安全性
-      response.cookies.delete('temp_bypass');
-      return response;
+
+    // 🚀 [修改點 8] 白名單放行：如果網址帶有 auth_tenant，代表前端正在同步中，放行。
+    if (searchParams.has('auth_tenant')) {
+      return NextResponse.next();
     }
+
+    // // 🚀 [修正] 如果有 temp_bypass 標記，視為安全回歸，予以放行
+    // if (hasTempBypass) {
+    //   const response = NextResponse.next();
+    //   // 使用完畢立即清除，確保安全性
+    //   response.cookies.delete('temp_bypass');
+    //   return response;
+    // }
+
     console.log("🐞 middleware 規則0 → 未登入阻擋, redirect 到登入頁");
     // ✅ 修正點 2：針對「連續刷新」的防護
     // 如果 URL 沒帶這參數，我們先嘗試原地刷新一次，不直接踢走
@@ -70,14 +77,14 @@ export async function middleware(request: NextRequest) {
   if (authTenant && authTenant !== targetTenant) {
     console.log("🐞 middleware 規則1 → 跨租戶切換, authTenant:", authTenant, "targetTenant:", targetTenant);
     if (isDashboardArea || isLoginPage) {
-    const origin = request.nextUrl.origin;
-    const url = new URL(pathname, origin);
-    url.searchParams.set('pending_switch', 'true');
-    url.searchParams.set('target_tenant', targetTenant);
-    url.searchParams.set('auth_tenant', authTenant);
-    console.log("🐞 middleware redirect 加上 pending_switch:", url.toString());
-    return NextResponse.redirect(url);
-  }
+      const origin = request.nextUrl.origin;
+      const url = new URL(pathname, origin);
+      url.searchParams.set('pending_switch', 'true');
+      url.searchParams.set('target_tenant', targetTenant);
+      url.searchParams.set('auth_tenant', authTenant);
+      console.log("🐞 middleware redirect 加上 pending_switch:", url.toString());
+      return NextResponse.redirect(url);
+    }
   }
 
   // --- 規則 2：同租戶登入頁 ---
