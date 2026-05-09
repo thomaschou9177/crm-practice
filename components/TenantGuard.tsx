@@ -79,6 +79,9 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       );
 
       if (confirmed && formRef.current) {
+        // 選「是」：正常提交 form 登出並轉換
+        isNavigatingRef.current = true;
+        sessionStorage.setItem('skip_logout', 'true');
         const sid = sessionStorage.getItem('tab_session_id');
         const sidInput = formRef.current.querySelector('input[name="sessionId"]') as HTMLInputElement;
         if (sidInput && sid) sidInput.value = sid;
@@ -105,37 +108,39 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
 
         // 3. 執行跳轉
         // 使用 window.location.replace 確保環境乾淨重新觸發 Middleware 判定
-        setTimeout(() => {
-          window.location.replace(returnUrl.toString());
-        }, 50);
+        // 🚀 [修正] 使用 replace 強制觸發路徑變動
+        window.location.replace(returnUrl.toString());
       }
     }
   }, [searchParams, currentTenant]);
 
   // --- 邏輯 C：新增的分頁關閉自動登出 (防止跳轉時誤觸發) ---
   useEffect(() => {
+    // 🚀 [新增] 只要進入組件且沒有 pending 參數，延遲一點點就清理標記
+    const hasPending = searchParams.has('pending_switch');
     // 每次進入/重新整理頁面，確保標記在完成載入後會被清理
     const cleanup = setTimeout(() => {
-      sessionStorage.removeItem('skip_logout');
-      // 🚀 [新增] 同步重置 Ref 標記
-      isNavigatingRef.current = false;
-    }, 1000);
-    const handleUnload = () => {
-      // 🚀 [修改] 檢查是否為「刷新行為」
-      // 🚀 [修改]：更精確的刷新行為偵測
-      const navEntries = window.performance.getEntriesByType('navigation');
-      const isReloading = navEntries.length > 0 && (navEntries[0] as PerformanceNavigationTiming).type === 'reload';
-
-      // 🚀 [修改] 判斷是否應該跳過登出：(Ref 標記 OR 刷新行為 OR sessionStorage 標記)
-      const isSkipping = 
-        isNavigatingRef.current || 
-        isReloading || 
-        sessionStorage.getItem('skip_logout') === 'true';
-      
-      if (isSkipping) {
-        return; 
+      if (!hasPending) {
+        sessionStorage.removeItem('skip_logout');
+        // 🚀 [新增] 同步重置 Ref 標記
+        isNavigatingRef.current = false;
       }
-
+    }, 2000);
+    const handleUnload = () => {
+      // 1. 🚀 [精確偵測行為]：在 unload 瞬間判斷導航類型
+      const navEntries = window.performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+      const navType = navEntries.length > 0 ? navEntries[0].type : '';
+      // 排除刷新 (reload) 與 瀏覽器前進後退 (back_forward)
+      const isStandardNavigation = navType === 'reload' || navType === 'back_forward';
+      // 2. 🚀 [多重標記檢查]
+      const isManualSkipping = isNavigatingRef.current === true;
+      const isStorageSkipping = sessionStorage.getItem('skip_logout') === 'true';
+      // 🚀 [修改] 判斷是否應該跳過登出：(Ref 標記 OR 刷新行為 OR sessionStorage 標記)
+      // 🐞 Debug: 如果被攔截，開發者工具可能看不到，但這能幫助邏輯判斷
+      if (isStandardNavigation || isManualSkipping || isStorageSkipping) {
+        return; // 命中任何一項保護規則，直接終止，不發送登出 API
+      }
+      //3. 執行自動登出 (僅限真正「關閉分頁」或「輸入新網址離開」)
       const sid = sessionStorage.getItem('tab_session_id');
       if (!sid) return;
 
