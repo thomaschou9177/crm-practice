@@ -38,40 +38,31 @@ export async function middleware(request: NextRequest) {
   // 🐞 Debug: 印出 URL 與判斷結果
   console.log("🐞 middleware URL:", pathname, "targetTenant:", targetTenant, "isLoginPage:", isLoginPage, "isDashboardArea:", isDashboardArea);
   // ✅ 重要修正：如果已經帶有 pending_switch 參數，說明已經在處理跳轉中，放行讓 TenantGuard 處理
-  if (searchParams.has('pending_switch')) {
-    console.log("🐞 middleware 放行 pending_switch");
-    return NextResponse.next();
+  // --- 🚀 [最新修改處]：前端鎖定 Handshake 機制 ---
+  // 當使用者進入 Dashboard，如果 URL 沒有同步標記，強制重導向帶上標記
+  // 這確保了如果是「新分頁貼上網址」，一定會經過 TenantGuard 的 useEffect 檢查
+  if (isDashboardArea && 
+      !searchParams.has('check_sync') && 
+      !searchParams.has('pending_switch') && 
+      !searchParams.has('auth_tenant')) {
+    const url = request.nextUrl.clone();
+    url.searchParams.set('check_sync', '1');
+    return NextResponse.redirect(url);
   }
 
-  // --- 規則 0：未登入阻擋 ---
-  if (isDashboardArea && !authTenant) {
-
-    // 🚀 [修改點 8] 白名單放行：如果網址帶有 auth_tenant，代表前端正在同步中，放行。
-    if (searchParams.has('auth_tenant')) {
-      return NextResponse.next();
+  // --- 規則 0：無 Session 處理 ---
+  if (!session) {
+    if (isDashboardArea) {
+      if (!searchParams.get('retry')) {
+        const retryUrl = new URL(request.url);
+        retryUrl.searchParams.set('retry', '1');
+        return NextResponse.redirect(retryUrl);
+      }
+      const origin = request.nextUrl.origin;
+      const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
+      return NextResponse.redirect(loginPage);
     }
-
-    // // 🚀 [修正] 如果有 temp_bypass 標記，視為安全回歸，予以放行
-    // if (hasTempBypass) {
-    //   const response = NextResponse.next();
-    //   // 使用完畢立即清除，確保安全性
-    //   response.cookies.delete('temp_bypass');
-    //   return response;
-    // }
-
-    console.log("🐞 middleware 規則0 → 未登入阻擋, redirect 到登入頁");
-    // ✅ 修正點 2：針對「連續刷新」的防護
-    // 如果 URL 沒帶這參數，我們先嘗試原地刷新一次，不直接踢走
-    // 這給了 TenantGuard 在客戶端把 sessionStorage 補回 Cookie 的時間
-    if (!searchParams.has('retry')) {
-      const retryUrl = new URL(request.url);
-      retryUrl.searchParams.set('retry', '1');
-      return NextResponse.redirect(retryUrl);
-    }
-    // 如果連重試一次都沒 Session，才真的踢回登入頁
-    const origin = request.nextUrl.origin;
-    const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
-    return NextResponse.redirect(loginPage);
+    return NextResponse.next();
   }
   // --- 規則 1：跨租戶切換 ---
   if (authTenant && authTenant !== targetTenant) {

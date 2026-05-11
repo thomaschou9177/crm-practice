@@ -10,41 +10,52 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
   const formRef = useRef<HTMLFormElement>(null);
   const isNavigatingRef = useRef(false);
 
-  // --- 邏輯 A：Session 同步核心 ---
-  // 責任：確保刷新或跳轉後，Cookie 能快速從 sessionStorage 恢復
+  // --- 邏輯 A：Session 同步與「新分頁」攔截 ---
   useEffect(() => {
     const syncSession = () => {
       const sid = sessionStorage.getItem('tab_session_id');
-      if (sid) {
-        // ✅ 寫入 Session Cookie (不設 expires)
-        document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
+      
+      // 🚀 [最新修改處]：處理新分頁貼上網址的情況
+      if (!sid) {
+        console.warn("🔍 無法獲取分頁 Session (可能是新分頁)，執行強制跳轉...");
         
-        // 🚀 清理 URL 上的輔助參數，讓網址列保持乾淨
-        const params = new URLSearchParams(searchParams.toString());
-        const needsCleanup = 
-          params.has('retry') || 
-          params.has('auth_tenant') || 
-          params.has('pending_switch') ||
-          params.has('target_tenant');
-
-        if (needsCleanup) {
-          params.delete('retry');
-          params.delete('auth_tenant');
-          params.delete('pending_switch');
-          params.delete('target_tenant');
-
-          const newSearch = params.toString();
-          const cleanPath = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-          window.history.replaceState(null, '', cleanPath);
-        }
-      } else {
-        // 若連 sessionStorage 都沒了，清除 Cookie
+        // 1. 強制清除 Cookie，確保 Middleware 下次攔截
         document.cookie = "sessionId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+        
+        // 2. 決定導向哪一個登入頁
+        const loginPath = currentTenant === 'public' ? '/' : `/${currentTenant}`;
+        
+        // 3. 直接使用 window.location 跳轉，確保徹底重新載入
+        window.location.href = loginPath;
+        return;
+      }
+
+      // ✅ 正常刷新或合法進入：從 sessionStorage 恢復 Cookie
+      document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
+      
+      // 🚀 清理 URL 上的輔助參數
+      const params = new URLSearchParams(searchParams.toString());
+      const needsCleanup = 
+        params.has('check_sync') ||
+        params.has('retry') || 
+        params.has('auth_tenant') || 
+        params.has('pending_switch');
+
+      if (needsCleanup) {
+        params.delete('check_sync');
+        params.delete('retry');
+        params.delete('auth_tenant');
+        params.delete('pending_switch');
+        params.delete('target_tenant');
+
+        const newSearch = params.toString();
+        const cleanPath = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+        window.history.replaceState(null, '', cleanPath);
       }
     };
 
     syncSession();
-  }, [searchParams]);
+  }, [searchParams, currentTenant]);
 
   // --- 邏輯 B：租戶切換監控 (選擇「否」的回航) ---
   useEffect(() => {
