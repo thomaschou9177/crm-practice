@@ -48,7 +48,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // --- 🚀 [最新修改處 2]：簡化權限邏輯 (移除 pending_switch) ---
+  // --- 🚀 [最新修改處 2]：簡化權限邏輯 (移除 pending_switch,retry) ---
   
   // 規則 A：訪問 Dashboard 區域時
   if (isDashboardArea) {
@@ -56,8 +56,8 @@ export async function middleware(request: NextRequest) {
     if (!session || authTenant !== targetTenant) {
       const origin = request.nextUrl.origin;
       const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
-      // 加上 retry 避免極端情況下的無限循環
-      if (!searchParams.has('retry')) loginPage.searchParams.set('retry', '1');
+      // // 加上 retry 避免極端情況下的無限循環
+      // if (!searchParams.has('retry')) loginPage.searchParams.set('retry', '1');
       return NextResponse.redirect(loginPage);
     }
   }
