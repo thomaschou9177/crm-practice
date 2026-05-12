@@ -61,12 +61,19 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginPage);
     }
   }
-
+  // 🚀 [新增邏輯]：如果 URL 帶有 'force_login'，說明是前端 Guard 判斷沒 Session 踢回來的
+  // 此時即便有 Cookie，也絕對不要自動導向 Dashboard
+  const isForcedLogin = searchParams.has('force_login');
   // 規則 B：訪問登入頁時，如果已經登入該租戶，直接進 Dashboard
   if (isLoginPage && authTenant === targetTenant) {
-    const origin = request.nextUrl.origin;
-    const dashPath = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
-    return NextResponse.redirect(new URL(dashPath, origin));
+    // 如果不是被強制踢回來的，才執行自動登入跳轉
+    if (!isForcedLogin) {
+      console.log("🐞 middleware: 有 Cookie，自動導向 Dashboard");
+      const origin = request.nextUrl.origin;
+      const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
+      return NextResponse.redirect(new URL(currentDash, origin));
+    }
+    console.log("🐞 middleware: 偵測到 force_login 標記，停留在登入頁");
   }
 
   return NextResponse.next();

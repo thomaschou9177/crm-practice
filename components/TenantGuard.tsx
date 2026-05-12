@@ -19,16 +19,14 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       if (!sid && hasCheckSync) {
         console.warn("🔍 偵測到新分頁且無 SessionStorage，安全跳轉...");
         
-        // --- 核心修改：不要清除 Cookie！！ ---
-        // 直接跳轉即可。因為 Cookie 是共用的，
-        // 讓 Middleware 發現 Cookie 雖然存在但這分頁沒資格用（由 TenantGuard 導走）
-        // 但不要去破壞 Cookie，以免影響到其他有 sid 的分頁。
-        
-        // 2. 決定導向哪一個登入頁
+        const origin = window.location.origin;
         const loginPath = currentTenant === 'public' ? '/' : `/${currentTenant}`;
+        const loginUrl = new URL(loginPath, origin);
         
-        // 3. 直接使用 window.location 跳轉，確保徹底重新載入
-        window.location.href = loginPath;
+        // 加上 force_login 告訴 Middleware：別再把我導回 Dashboard 了！
+        loginUrl.searchParams.set('force_login', '1');
+        
+        window.location.replace(loginUrl.toString());
         return;
       }
 
