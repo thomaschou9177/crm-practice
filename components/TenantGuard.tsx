@@ -14,10 +14,10 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
   useEffect(() => {
     const syncSession = () => {
       const sid = sessionStorage.getItem('tab_session_id');
-      
+      const hasCheckSync = searchParams.has('check_sync');
       // 🚀 [最新修改處]：處理新分頁貼上網址的情況
-      if (!sid) {
-        console.warn("🔍 此分頁無 SessionStorage，導向登入頁...");
+      if (!sid && hasCheckSync) {
+        console.warn("🔍 偵測到新分頁且無 SessionStorage，安全跳轉...");
         
         // --- 核心修改：不要清除 Cookie！！ ---
         // 直接跳轉即可。因為 Cookie 是共用的，
