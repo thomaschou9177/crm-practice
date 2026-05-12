@@ -17,10 +17,12 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       
       // 🚀 [最新修改處]：處理新分頁貼上網址的情況
       if (!sid) {
-        console.warn("🔍 無法獲取分頁 Session (可能是新分頁)，執行強制跳轉...");
+        console.warn("🔍 此分頁無 SessionStorage，導向登入頁...");
         
-        // 1. 強制清除 Cookie，確保 Middleware 下次攔截
-        document.cookie = "sessionId=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+        // --- 核心修改：不要清除 Cookie！！ ---
+        // 直接跳轉即可。因為 Cookie 是共用的，
+        // 讓 Middleware 發現 Cookie 雖然存在但這分頁沒資格用（由 TenantGuard 導走）
+        // 但不要去破壞 Cookie，以免影響到其他有 sid 的分頁。
         
         // 2. 決定導向哪一個登入頁
         const loginPath = currentTenant === 'public' ? '/' : `/${currentTenant}`;
