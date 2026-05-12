@@ -42,50 +42,33 @@ export async function middleware(request: NextRequest) {
   // 當使用者進入 Dashboard，如果 URL 沒有同步標記，強制重導向帶上標記
   // 這確保了如果是「新分頁貼上網址」，一定會經過 TenantGuard 的 useEffect 檢查
   if (isDashboardArea && 
-      !searchParams.has('check_sync') && 
-      !searchParams.has('pending_switch') && 
-      !searchParams.has('auth_tenant')) {
+      !searchParams.has('check_sync')) {
     const url = request.nextUrl.clone();
     url.searchParams.set('check_sync', '1');
     return NextResponse.redirect(url);
   }
 
-  // --- 規則 0：無 Session 處理 ---
-  if (!session) {
-    if (isDashboardArea) {
-      if (!searchParams.get('retry')) {
-        const retryUrl = new URL(request.url);
-        retryUrl.searchParams.set('retry', '1');
-        return NextResponse.redirect(retryUrl);
-      }
+  // --- 🚀 [最新修改處 2]：簡化權限邏輯 (移除 pending_switch) ---
+  
+  // 規則 A：訪問 Dashboard 區域時
+  if (isDashboardArea) {
+    // 沒登入，或是登入的租戶與目標不符
+    if (!session || authTenant !== targetTenant) {
       const origin = request.nextUrl.origin;
       const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
+      // 加上 retry 避免極端情況下的無限循環
+      if (!searchParams.has('retry')) loginPage.searchParams.set('retry', '1');
       return NextResponse.redirect(loginPage);
-    }
-    return NextResponse.next();
-  }
-  // --- 規則 1：跨租戶切換 ---
-  if (authTenant && authTenant !== targetTenant) {
-    console.log("🐞 middleware 規則1 → 跨租戶切換, authTenant:", authTenant, "targetTenant:", targetTenant);
-    if (isDashboardArea || isLoginPage) {
-      const origin = request.nextUrl.origin;
-      const url = new URL(pathname, origin);
-      url.searchParams.set('pending_switch', 'true');
-      url.searchParams.set('target_tenant', targetTenant);
-      url.searchParams.set('auth_tenant', authTenant);
-      console.log("🐞 middleware redirect 加上 pending_switch:", url.toString());
-      return NextResponse.redirect(url);
     }
   }
 
-  // --- 規則 2：同租戶登入頁 ---
+  // 規則 B：訪問登入頁時，如果已經登入該租戶，直接進 Dashboard
   if (isLoginPage && authTenant === targetTenant) {
-    console.log("🐞 middleware 規則2 → 同租戶登入頁, redirect 到 dashboard");
     const origin = request.nextUrl.origin;
-    const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
-    return NextResponse.redirect(new URL(currentDash, origin));
+    const dashPath = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
+    return NextResponse.redirect(new URL(dashPath, origin));
   }
-  console.log("🐞 middleware 最後放行 → NextResponse.next()");
+
   return NextResponse.next();
 }
 

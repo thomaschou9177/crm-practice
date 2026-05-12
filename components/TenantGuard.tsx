@@ -57,41 +57,43 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     syncSession();
   }, [searchParams, currentTenant]);
 
-  // --- 邏輯 B：租戶切換監控 (選擇「否」的回航) ---
-  useEffect(() => {
-    const pendingSwitch = searchParams.get('pending_switch');
-    if (pendingSwitch === 'true') {
-      const targetTenant = searchParams.get('target_tenant');
-      const authTenant = searchParams.get('auth_tenant');
+
+  // // --- 邏輯 B：租戶切換監控 (選擇「否」的回航) ---
+  // useEffect(() => {
+  //   const pendingSwitch = searchParams.get('pending_switch');
+  //   if (pendingSwitch === 'true') {
+  //     const targetTenant = searchParams.get('target_tenant');
+  //     const authTenant = searchParams.get('auth_tenant');
       
-      const confirmed = window.confirm(
-        `您目前登入於 ${authTenant}，是否切換至 ${targetTenant}? (此操作將登出目前帳號)`
-      );
+  //     const confirmed = window.confirm(
+  //       `您目前登入於 ${authTenant}，是否切換至 ${targetTenant}? (此操作將登出目前帳號)`
+  //     );
 
-      if (confirmed && formRef.current) {
-        // 選「是」：正常提交 form 登出並轉換
-        isNavigatingRef.current = true;
-        const sid = sessionStorage.getItem('tab_session_id');
-        const sidInput = formRef.current.querySelector('input[name="sessionId"]') as HTMLInputElement;
-        if (sidInput && sid) sidInput.value = sid;
+  //     if (confirmed && formRef.current) {
+  //       // 選「是」：正常提交 form 登出並轉換
+  //       isNavigatingRef.current = true;
+  //       const sid = sessionStorage.getItem('tab_session_id');
+  //       const sidInput = formRef.current.querySelector('input[name="sessionId"]') as HTMLInputElement;
+  //       if (sidInput && sid) sidInput.value = sid;
         
-        // 準備跳轉前清除目前的 sid，因為要登入新租戶了
-        sessionStorage.removeItem('tab_session_id');
-        formRef.current.requestSubmit();
-      } else {
-        // --- 選擇「否」：直接跳回原租戶 Dashboard ---
-        const originalTenant = authTenant || currentTenant;
-        const path = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
+  //       // 準備跳轉前清除目前的 sid，因為要登入新租戶了
+  //       sessionStorage.removeItem('tab_session_id');
+  //       formRef.current.requestSubmit();
+  //     } else {
+  //       // --- 選擇「否」：直接跳回原租戶 Dashboard ---
+  //       const originalTenant = authTenant || currentTenant;
+  //       const path = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
         
-        const returnUrl = new URL(path, window.location.origin);
-        // 帶上 auth_tenant 讓 Middleware 放行一次，隨後由邏輯 A 接手恢復
-        returnUrl.searchParams.set('auth_tenant', originalTenant as string);
+  //       const returnUrl = new URL(path, window.location.origin);
+  //       // 帶上 auth_tenant 讓 Middleware 放行一次，隨後由邏輯 A 接手恢復
+  //       returnUrl.searchParams.set('auth_tenant', originalTenant as string);
 
-        // 🚀 因為沒有 beforeunload 監聽，這裡 replace 不會觸發任何登出請求
-        window.location.replace(returnUrl.toString());
-      }
-    }
-  }, [searchParams, currentTenant]);
+  //       // 🚀 因為沒有 beforeunload 監聽，這裡 replace 不會觸發任何登出請求
+  //       window.location.replace(returnUrl.toString());
+  //     }
+  //   }
+  // }, [searchParams, currentTenant]);
+
 
   // --- 邏輯 C：已移除 beforeunload 監聽 ---
   // 不再主動發送 navigator.sendBeacon
