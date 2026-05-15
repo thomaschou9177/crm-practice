@@ -1,7 +1,6 @@
 // app/page.tsx
 'use client';
 
-import { useRouter } from 'next/navigation'; // Import the router
 import { useActionState, useEffect, useState } from 'react';
 import { loginPublic } from './dashboard/actions';
 
@@ -45,7 +44,7 @@ const VALID_USERS = [
 ];
 
 export default function Home() {
-  const router = useRouter(); // Initialize router
+  // const router = useRouter(); // Initialize router
   const [lang, setLang] = useState<'en' | 'zh' | 'jp'>('en');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -59,16 +58,18 @@ export default function Home() {
       sessionStorage.setItem('tab_session_id', state.sessionId);
       // 🔍 驗證訊息
       console.log("Debug: 已寫入 SessionStorage tab_session_id =", sessionStorage.getItem("tab_session_id"));
+      // 2. ✅ 修改點：使用特定的 Cookie 名稱 session_public
+      const cookieName = "session_public";
       // 2. 同步到 Cookie，讓 Middleware 能夠讀取並驗證身分
       // 不設定 maxAge，這會讓它在瀏覽器進程結束時失效 (視瀏覽器而定)
-      document.cookie = `sessionId=${state.sessionId}; path=/; SameSite=Lax; ${
+      document.cookie = `${cookieName}=${state.sessionId}; path=/; SameSite=Lax; ${
         window.location.protocol === 'https:' ? 'Secure' : ''
       }`;
 
-      // 3. 執行跳轉
-      router.push(state.redirectTo || '/dashboard');
+      // 3. 硬跳轉
+      window.location.href = state.redirectTo || '/dashboard';
     }
-  }, [state, router]);
+  }, [state]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-6">

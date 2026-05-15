@@ -9,34 +9,26 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.includes('favicon.ico')) {
     return NextResponse.next();
   }
-
-  // 從 cookie 讀取 sessionId
-  const sessionId = request.cookies.get('sessionId')?.value;
-  // 🐞 Debug: 印出收到的 sessionId
-  console.log("🐞 middleware 收到 sessionId:", sessionId);
-  // ✅ 改為 await 取得 Supabase 資料[cite: 10]
-  const session = sessionId ? await getSession(sessionId) : null;
-  // 🐞 Debug: 印出 getSession 查詢結果
-  console.log("🐞 middleware getSession 結果:", session);
-
-  const authTenant = session?.tenant;
-  // 🐞 Debug: 印出 authTenant
-  console.log("🐞 middleware 判斷 authTenant:", authTenant);
-  // const isLoggedIn = Boolean(session?.isLoggedIn);
-
-  // // 🚀 [修正] 讀取前端埋下的暫時放行標記
-  // const hasTempBypass = request.cookies.has('temp_bypass');
-
   // 自動解析 URL 第一段作為 tenant
   const segments = pathname.split('/').filter(Boolean); // e.g. "/tenant3/dashboard" → ["tenant3","dashboard"]
-  let targetTenant = segments[0] || 'public';
-  if (targetTenant === 'dashboard') targetTenant = 'public';
-
-  const isLoginPage = pathname === '/' || (segments.length === 1 && segments[0] !== 'dashboard');
+  // let targetTenant = segments[0] || 'public';
+  // if (targetTenant === 'dashboard') targetTenant = 'public';
+  const targetTenant = (segments[0] === 'dashboard') ? 'public' : segments[0];
+  // 定義 Dashboard 與 登入頁 判斷
   const isDashboardArea = pathname.includes('/dashboard');
-
+  const isLoginPage = (targetTenant === 'public' && pathname === '/') || 
+                      (targetTenant !== 'public' && pathname === `/${targetTenant}`);
+  // 🚀 [修改點]：根據租戶區分 Cookie 名稱 (若你打算實作租戶隔離)
+  // 或者統一使用 sessionId，但由 TenantGuard 驗證 sessionStorage
+  // 如果是 public 租戶，找 session_public；如果是 tenant1，找 session_tenant1
+  const cookieName = targetTenant === 'public' ? 'session_public' : `session_${targetTenant}`;
+  const sessionId = request.cookies.get(cookieName)?.value;
+  // 🐞 Debug: 印出動態變量幫助排查
+  console.log(`🐞 middleware [${targetTenant}] 嘗試讀取 Cookie: ${cookieName} =`, sessionId);
+  const session = sessionId ? await getSession(sessionId) : null;
+  const authTenant = session?.tenant;
   // 🐞 Debug: 印出 URL 與判斷結果
-  console.log("🐞 middleware URL:", pathname, "targetTenant:", targetTenant, "isLoginPage:", isLoginPage, "isDashboardArea:", isDashboardArea);
+  console.log(`🐞 Middleware 檢查: path=${pathname}, target=${targetTenant}, auth=${authTenant}`);
   // ✅ 重要修正：如果已經帶有 pending_switch 參數，說明已經在處理跳轉中，放行讓 TenantGuard 處理
   // --- 🚀 [最新修改處]：前端鎖定 Handshake 機制 ---
   // 當使用者進入 Dashboard，如果 URL 沒有同步標記，強制重導向帶上標記

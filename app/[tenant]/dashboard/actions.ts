@@ -17,6 +17,10 @@ import { redirect } from 'next/navigation';
   
   if (sessionId) {
     await destroySession(sessionId); // 刪除資料庫紀錄[cite: 12]
+  }else {
+    // 備援方案：如果沒傳 sid，嘗試從 cookie 抓取 (雖然多分頁下不夠精準)
+    const cookieSid = cookieStore.get('sessionId')?.value;
+    if (cookieSid) await destroySession(cookieSid);
   }
 
   // ✅ 2. 清除 Cookie
@@ -217,9 +221,19 @@ const TENANT_USERS: Record<string, { username: string; password: string }[]> = {
       isLoggedIn: true,
       user: { name: user.username }
     });
+    // 🚀 [新增] 登入成功時，先在 Server 端寫入一次 Cookie
+    // 這樣在之後的 redirect 過程中，Middleware 就能立刻識別身分
+    const cookieStore = await cookies();
+    cookieStore.set('sessionId', sessionId, {
+      path: '/',
+      httpOnly: false, // 設為 false 才能讓前端 TenantGuard 讀取/清理
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
+    
     return { 
       success: true, 
-      sessionId, 
+      sessionId, // 🚩 重要：回傳給前端存入 sessionStorage
       tenant,
       redirectTo: tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard` 
     };

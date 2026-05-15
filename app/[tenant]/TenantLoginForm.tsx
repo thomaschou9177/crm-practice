@@ -1,14 +1,13 @@
 // app/[tenant]/TenantLoginForm.tsx
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useActionState, useEffect } from "react"; // ✅ 引入 useActionState
 import { loginTenant } from "./dashboard/actions"; // ✅ 確保路徑正確
 
 export default function TenantLoginForm({ tenant }: { tenant: string }) {
   // ✅ 使用 useActionState 綁定 Action
   // state 將接收來自 loginTenant 回傳的 { error: "..." }
-  const router = useRouter();
+  // const router = useRouter();
   const [state, formAction, isPending] = useActionState(loginTenant, null);
   // ✅ 新增：處理分頁獨立 Session 邏輯
   useEffect(() => {
@@ -16,15 +15,21 @@ export default function TenantLoginForm({ tenant }: { tenant: string }) {
       // 1. 存入該分頁特有的 sessionStorage
       sessionStorage.setItem('tab_session_id', state.sessionId);
       
+      // 🚀 [建議修改處]：使用「租戶專屬」的 Cookie 名稱
+      // 這樣當 tenant1 登入時，不會蓋掉 public 的 session Cookie
+      const cookieName = `session_${tenant}`;
+
       // 2. 同步到 Cookie 供 Middleware 驗證 (Session Cookie 模式)
-      document.cookie = `sessionId=${state.sessionId}; path=/; SameSite=Lax; ${
+      document.cookie = `${cookieName}=${state.sessionId}; path=/; SameSite=Lax; ${
         window.location.protocol === 'https:' ? 'Secure' : ''
       }`;
 
       // 3. 導向該租戶的 Dashboard
-      router.push(state.redirectTo || `/${tenant}/dashboard`);
+      // 建議使用 window.location.href 而不是 router.push 
+      // 這樣可以確保整頁重新載入，讓 Middleware 重新執行並抓到最新的 Cookie
+      window.location.href = state.redirectTo || (tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard`);
     }
-  }, [state, tenant, router]);
+  }, [state, tenant]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-100">

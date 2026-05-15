@@ -31,15 +31,20 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
       }
 
       // ✅ 正常刷新或合法進入：從 sessionStorage 恢復 Cookie
-      document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
+      // document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
       
+      // 🚀 新增以下程式碼：使用租戶專屬 Cookie 名稱
+      const cookieName = `session_${currentTenant}`;
+      document.cookie = `${cookieName}=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
+
       // 🚀 清理 URL 上的輔助參數
       const params = new URLSearchParams(searchParams.toString());
       const needsCleanup = 
         params.has('check_sync') ||
         params.has('retry') || 
         params.has('auth_tenant') || 
-        params.has('pending_switch');
+        params.has('pending_switch')|| 
+        params.has('target_tenant');
 
       if (needsCleanup) {
         params.delete('check_sync');

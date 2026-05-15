@@ -11,14 +11,14 @@ import { redirect } from 'next/navigation';
   const tenant = formData.get('tenant')?.toString() || 'public';
   // const targetTenant = formData.get('target_tenant')?.toString();
 
-  // 這裡「不需要」呼叫 API
-  // 在 Server Action 中直接刪除 Cookie 是最快、最穩定的做法
+  // 🚀 新增：接收來自前端 TenantGuard 的特定 sessionId
+  const sessionIdFromForm = formData.get('sessionId')?.toString();
   const cookieStore = await cookies();
-  const sessionId = cookieStore.get('sessionId')?.value;
+  // const sessionId = cookieStore.get('sessionId')?.value;
 
-  if (sessionId) {
+  if (sessionIdFromForm) {
     // 如果後端有 session store，在這裡銷毀它
-    await destroySession(sessionId); 
+    await destroySession(sessionIdFromForm); 
   }
 
   cookieStore.delete('sessionId');
@@ -194,6 +194,14 @@ import { redirect } from 'next/navigation';
       tenant: 'public',
       isLoggedIn: true,
       user: { name: user.username }
+    });
+    // 🚀 新增：在 Server 端先寫入 Session Cookie，輔助第一次跳轉
+    const cookieStore = await cookies();
+    cookieStore.set('sessionId', sessionId, {
+      path: '/',
+      httpOnly: false, // 必須為 false，讓前端 JavaScript 能讀取並存入 sessionStorage
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
     });
     // ✅ 2.我們改為回傳結果給前端，讓前端處理 sessionStorage 與同步
     return { 
