@@ -240,6 +240,8 @@ for (const key of allDynamicKeys) {
             <form action={clearFiltersWithTenant}><button className="text-gray-400 hover:text-red-500 underline text-[8px]">Clear Table Filters</button></form>
           </div>
           <form action={handleTableSearch} className="grid grid-cols-8 gap-2">
+            {/* 🚀 關鍵 1：必須加上這個隱藏欄位，後端 formData.get("tenant") 才拿得到值！ */}
+            <input type="hidden" name="tenant" value={tenant} />
             {/* 關鍵：把目前的 params 轉成字串傳給後端 */}
             <input type="hidden" name="currentSearchParams" value={new URLSearchParams(params as any).toString()} />
             <input name="id" placeholder="ID" className="border p-2 rounded" defaultValue={id} />
@@ -494,6 +496,8 @@ for (const key of allDynamicKeys) {
         <div className="bg-indigo-50 p-4 rounded border border-indigo-100 mb-4">
           <h2 className="text-[9px] font-bold text-indigo-900 uppercase mb-2">Table Filter (customer_info)</h2>
           <form action={handleSyncSearch} className="flex gap-2 max-w-2xl">
+            {/* 🚀 關鍵 1：必須加上這個隱藏欄位，後端 formData.get("tenant") 才拿得到值！ */}
+            <input type="hidden" name="tenant" value={tenant} />
             {/* 關鍵：把目前的 params 轉成字串傳給後端 */}
             <input type="hidden" name="currentSearchParams" value={new URLSearchParams(params as any).toString()} />
             <input name="syncId" placeholder="Filter Sync ID" className="border p-2 rounded flex-1 bg-white" defaultValue={syncId} />
