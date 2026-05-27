@@ -152,7 +152,8 @@ import { redirect } from 'next/navigation';
     }
   }
 
-  export async function handleTableSearch(tenant:string,formData: FormData) {
+  export async function handleTableSearch(formData: FormData) {
+    const tenant = formData.get("tenant")?.toString() || "public";
     // 1. 取得目前完整的 URL 參數 (這需要從 formData 裡拿到目前的 searchParams 字串)
     const currentParamsStr = formData.get("currentSearchParams")?.toString() || "";
     // Create a fresh params object to ensure a clean URL

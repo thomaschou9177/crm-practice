@@ -18,13 +18,6 @@ export default async function DashboardPage(props:{
  {
   const { tenant } = await props.params; // 這裡拿到 tenant1 或 tenant2 tenantX
 
-  // const cookieStore = await cookies();
-  // const authTenant = cookieStore.get('auth_tenant')?.value;
-
-  // 如果伺服器端發現網址與 Cookie 不符，立即停止渲染
-  // if (authTenant !== tenant) {
-  //   redirect(authTenant ? `/${authTenant}/dashboard` : `/${tenant}`);
-  // }
  // ✅ await 解開 Promise
   const params: Record<string, string | undefined> =await props.searchParams;
   // 重要：改用對應的 Prisma 客戶端
@@ -34,7 +27,7 @@ export default async function DashboardPage(props:{
   // ---------------------------------------------------------
   const updateCoreDataWithTenant = updateCoreData.bind(null, tenant);
   const addCustomerWithTenant = addCustomer.bind(null, tenant);
-  const handleTableSearchWithTenant = handleTableSearch.bind(null, tenant);
+  // const handleTableSearchWithTenant = handleTableSearch.bind(null, tenant);
   const addOrUpdateColumnWithTenant = addOrUpdateColumn.bind(null, tenant);
   const clearFiltersWithTenant = clearFilters.bind(null, tenant);
   const deleteRowWithTenant = deleteRow.bind(null, tenant);
@@ -246,7 +239,7 @@ for (const key of allDynamicKeys) {
             <h2 className="font-bold text-indigo-600 uppercase text-[9px]">Table Filter (Customer Data)</h2>
             <form action={clearFiltersWithTenant}><button className="text-gray-400 hover:text-red-500 underline text-[8px]">Clear Table Filters</button></form>
           </div>
-          <form action={handleTableSearchWithTenant} className="grid grid-cols-8 gap-2">
+          <form action={handleTableSearch} className="grid grid-cols-8 gap-2">
             {/* 關鍵：把目前的 params 轉成字串傳給後端 */}
             <input type="hidden" name="currentSearchParams" value={new URLSearchParams(params as any).toString()} />
             <input name="id" placeholder="ID" className="border p-2 rounded" defaultValue={id} />
