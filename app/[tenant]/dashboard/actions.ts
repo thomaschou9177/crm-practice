@@ -160,7 +160,7 @@ import { redirect } from 'next/navigation';
     const params = new URLSearchParams(currentParamsStr);
     // 2. 更新或設定 Customer 相關的過濾條件
     formData.forEach((value, key) => {
-      if (key === "currentSearchParams") return; // 跳過隱藏欄位本身
+      if (key === "currentSearchParams" || key === "tenant") return; // 跳過隱藏欄位本身
       if (value && value.toString().trim() !== "") {
         params.set(key, value.toString());
       }else{
@@ -178,7 +178,7 @@ import { redirect } from 'next/navigation';
     
     
     formData.forEach((value, key) => {
-      if (key === "currentSearchParams") return;
+      if (key === "currentSearchParams" || key === "tenant") return;
       if (value && value.toString().trim() !== "") {
         params.set(key, value.toString());
       }else {
