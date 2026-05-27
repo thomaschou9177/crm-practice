@@ -33,7 +33,7 @@ export default async function DashboardPage(props:{
   const deleteRowWithTenant = deleteRow.bind(null, tenant);
   const deleteWholeColumnWithTenant = deleteWholeColumn.bind(null, tenant);
   // const handleLogoutWithTenant = handleLogout.bind(null, tenant);
-  const handleSyncSearchWithTenant = handleSyncSearch.bind(null, tenant);
+  // const handleSyncSearchWithTenant = handleSyncSearch.bind(null, tenant);
   const updateMetadataCellWithTenant = updateMetadataCell.bind(null, tenant);
   const updateSyncEmailWithTenant = updateSyncEmail.bind(null, tenant);
   
@@ -493,7 +493,7 @@ for (const key of allDynamicKeys) {
         {/* 2. FILTER FOR customer_info TABLE */}
         <div className="bg-indigo-50 p-4 rounded border border-indigo-100 mb-4">
           <h2 className="text-[9px] font-bold text-indigo-900 uppercase mb-2">Table Filter (customer_info)</h2>
-          <form action={handleSyncSearchWithTenant} className="flex gap-2 max-w-2xl">
+          <form action={handleSyncSearch} className="flex gap-2 max-w-2xl">
             {/* 關鍵：把目前的 params 轉成字串傳給後端 */}
             <input type="hidden" name="currentSearchParams" value={new URLSearchParams(params as any).toString()} />
             <input name="syncId" placeholder="Filter Sync ID" className="border p-2 rounded flex-1 bg-white" defaultValue={syncId} />

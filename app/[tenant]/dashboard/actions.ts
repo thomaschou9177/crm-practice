@@ -170,7 +170,8 @@ import { redirect } from 'next/navigation';
     redirect(`/${tenant}/dashboard?${params.toString()}`);
   }
 
-  export async function handleSyncSearch(tenant:string,formData: FormData) {
+  export async function handleSyncSearch(formData: FormData) {
+    const tenant = formData.get("tenant")?.toString() || "public";
     // 1. 這裡也要改成讀取 currentSearchParams，否則會清空 customer 表格的搜尋結果
     const currentParamsStr = formData.get("currentSearchParams")?.toString() || "";
     const params = new URLSearchParams(currentParamsStr);
