@@ -13,7 +13,8 @@ const translations = {
     signIn: "Sign In",
     // demoAccounts: "Valid Demo Accounts",
     error: "Invalid username or password. Please try again.",
-    success: "Login Successful! Welcome, "
+    success: "Login Successful! Welcome, ",
+    loading: "Signing in, please wait..." // 🚀 新增 Loading 翻譯
   },
   zh: {
     title: "CRM 系統登入",
@@ -23,7 +24,9 @@ const translations = {
     signIn: "登入",
     // demoAccounts: "有效測試帳號",
     error: "使用者名稱或密碼錯誤，請再試一次。",
-    success: "登入成功！歡迎，"
+    success: "登入成功！歡迎，",
+    loading: "系統登入中，請稍候..." // 🚀 新增 Loading 翻譯
+
   },
   jp: {
     title: "CRM ログイン",
@@ -33,15 +36,16 @@ const translations = {
     signIn: "サインイン",
     // demoAccounts: "有効なデモアカウント",
     error: "ユーザー名またはパスワードが無効です。もう一度お試しください。",
-    success: "ログインに成功しました！ようこそ、"
+    success: "ログインに成功しました！ようこそ、",
+    loading: "サインイン中、しばらくお待ちください..." // 🚀 新增 Loading 翻譯
   }
 };
 // Hardcoded valid credentials
-const VALID_USERS = [
-  { username: 'admin', password: 'password123' },
-  { username: 'user', password: 'user123' },
-  { username: 'test', password: 'test123' },
-];
+// const VALID_USERS = [
+//   { username: 'admin', password: 'password123' },
+//   { username: 'user', password: 'user123' },
+//   { username: 'test', password: 'test123' },
+// ];
 
 export default function Home() {
   // const router = useRouter(); // Initialize router
@@ -51,28 +55,43 @@ export default function Home() {
   const [error, setError] = useState('');
   const [state, formAction, isPending] = useActionState(loginPublic, null);
   const t = translations[lang];
+  // 🚀 新增一個狀態：用來鎖定「正在跳轉中」的畫面，防止 Server Action 結束後提示字消失
+  const [isRedirecting, setIsRedirecting] = useState(false);
   // ✅ 新增：監聽登入結果
   useEffect(() => {
-    if (state?.success && state.sessionId) {
-      // 1. 存入分頁獨立的 sessionStorage (達到刷新不登出、關閉分頁即登出)
-      sessionStorage.setItem('tab_session_id', state.sessionId);
-      // 🔍 驗證訊息
-      console.log("Debug: 已寫入 SessionStorage tab_session_id =", sessionStorage.getItem("tab_session_id"));
-      // 2. ✅ 修改點：使用特定的 Cookie 名稱 session_public
-      const cookieName = "session_public";
-      // 2. 同步到 Cookie，讓 Middleware 能夠讀取並驗證身分
-      // 不設定 maxAge，這會讓它在瀏覽器進程結束時失效 (視瀏覽器而定)
-      document.cookie = `${cookieName}=${state.sessionId}; path=/; SameSite=Lax; ${
-        window.location.protocol === 'https:' ? 'Secure' : ''
-      }`;
+    if (state?.success) {
+      // 1. 進入跳轉鎖定狀態
+      setIsRedirecting(true);
 
-      // 3. 硬跳轉
+      // 2. 寫入 sessionStorage 與 Cookie (比照租戶登入邏輯)
+      if (state.sessionId) {
+        sessionStorage.setItem('tab_session_id', state.sessionId);
+        document.cookie = `session_public=${state.sessionId}; path=/; SameSite=Lax; ${
+          window.location.protocol === 'https:' ? 'Secure' : ''
+        }`;
+      }
+
+      // 3. 執行整頁跳轉（這時畫面會維持 Loading 直到 Dashboard 渲染完成）
       window.location.href = state.redirectTo || '/dashboard';
     }
   }, [state]);
-
+  // 🚀 整合「點擊送出中」與「成功後跳轉中」的總載入狀態
+  const showLoading = isPending || isRedirecting;
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-6">
+    <main className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      
+      {/* 🚀 全畫面覆蓋的「登入中請等待」毛玻璃特效層 */}
+      {showLoading && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/70 backdrop-blur-md transition-all duration-300">
+          <div className="flex flex-col items-center space-y-4">
+            {/* 這裡放一個精美的 CSS 載入動畫圈圈 */}
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+            <p className="text-lg font-bold text-slate-800 animate-pulse">
+              {t.loading}
+            </p>
+          </div>
+        </div>
+      )}
       {/* Language Switcher */}
       <div className="absolute top-6 right-6 flex gap-2">
         {(['en', 'zh', 'jp'] as const).map((l) => (
@@ -128,12 +147,12 @@ export default function Home() {
 
           <button 
             type="submit"
-            disabled={isPending} // ✅ 防止重複提交
+            disabled={showLoading} // ✅ 防止重複提交
             className={`w-full rounded-xl py-4 font-bold text-white transition-all shadow-lg ${
               isPending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-200'
             }`}
           >
-            {isPending ? 'Signing In...' : t.signIn}
+            {showLoading ? t.loading : t.signIn}
           </button>
         </form>
 
