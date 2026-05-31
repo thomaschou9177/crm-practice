@@ -1,7 +1,7 @@
 // /middleware.ts
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getSession } from './lib/session';
+import { destroySession, getSession } from './lib/session';
 
 export async function middleware(request: NextRequest) {
   const { pathname,searchParams } = request.nextUrl;
@@ -18,6 +18,29 @@ export async function middleware(request: NextRequest) {
   const isDashboardArea = pathname.includes('/dashboard');
   const isLoginPage = (targetTenant === 'public' && pathname === '/') || 
                       (targetTenant !== 'public' && pathname === `/${targetTenant}`);
+  // 🚀 【更靈活的寫法】動態掃描所有 session 開頭的 Cookie
+  const allCookies = request.cookies.getAll();
+  let responseToUse: NextResponse | null = null;
+
+  for (const cookie of allCookies) {
+    const name = cookie.name;
+    
+    // 找出所有非當前目標租戶的 Session Cookie
+    const isPublicSessionMismatch = (targetTenant !== 'public' && name === 'session_public');
+    const isTenantSessionMismatch = (name.startsWith('session_') && name !== `session_${targetTenant}` && name !== 'session_public');
+
+    if (isPublicSessionMismatch || isTenantSessionMismatch) {
+      const oldSessionId = cookie.value;
+      console.log(`清理非當前租戶的 Cookie: ${name}`);
+
+      // 1. 資料庫銷毀
+      try { await destroySession(oldSessionId); } catch(e){}
+
+      // 2. 準備下達瀏覽器刪除指令
+      if (!responseToUse) responseToUse = NextResponse.next();
+      responseToUse.cookies.set(name, '', { path: '/', expires: new Date(0) });
+    }
+  }
   // 🚀 [修改點]：根據租戶區分 Cookie 名稱 (若你打算實作租戶隔離)
   // 或者統一使用 sessionId，但由 TenantGuard 驗證 sessionStorage
   // 如果是 public 租戶，找 session_public；如果是 tenant1，找 session_tenant1
@@ -53,7 +76,14 @@ export async function middleware(request: NextRequest) {
       // 💡 加上 force_login 讓前端 Guard 知道這是被 Middleware 攔截踢回來的
       loginPage.searchParams.set('force_login', '1');
       console.log(`❌ Middleware 攔截：未授權存取 ${targetTenant}，重新導向至 ${loginPage.pathname}`);
-      return NextResponse.redirect(loginPage);
+      // 💡 【修正】如果前面有觸發清除舊 Cookie 的行為，要把清除 Cookie 的指令帶到這個 redirect 上
+      const redirectResponse = NextResponse.redirect(loginPage);
+      if (responseToUse) {
+        responseToUse.cookies.getAll().forEach(cookie => {
+          redirectResponse.cookies.set(cookie.name, '', { path: '/', expires: new Date(0) });
+        });
+      }
+      return redirectResponse;
     }
   }
   // 🚀 [新增邏輯]：如果 URL 帶有 'force_login'，說明是前端 Guard 判斷沒 Session 踢回來的
@@ -64,13 +94,21 @@ export async function middleware(request: NextRequest) {
     // 如果不是被強制踢回來的，才執行自動登入跳轉
     console.log("🐞 middleware: 有 Cookie，自動導向 Dashboard");
     const origin = request.nextUrl.origin;
-    const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
-    console.log("🐞 middleware: 偵測到 force_login 標記，停留在登入頁");
-    return NextResponse.redirect(new URL(currentDash, origin));
+    const dashboardPath = targetTenant === 'public' ? '/dashboard' : `/${targetTenant}/dashboard`;
+    const redirectResponse = NextResponse.redirect(new URL(dashboardPath, origin));
+    // 帶上清除舊 Cookie 的行為
+    if (responseToUse) {
+      responseToUse.cookies.getAll().forEach(cookie => {
+        redirectResponse.cookies.set(cookie.name, '', { path: '/', expires: new Date(0) });
+      });
+    }
+    return redirectResponse;
   }
-
-  return NextResponse.next();
-}
+    // console.log("🐞 middleware: 偵測到 force_login 標記，停留在登入頁");
+    // return NextResponse.redirect(new URL(currentDash, origin));
+    // 如果有清除舊 Cookie 的 response，就回傳它，否則放行
+    return responseToUse || NextResponse.next();
+  }
 
 export const config = {
   matcher: ['/((?!_next|api|favicon.ico).*)'],
