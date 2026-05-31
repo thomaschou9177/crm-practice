@@ -59,9 +59,17 @@ export default function Home() {
   const [isRedirecting, setIsRedirecting] = useState(false);
   // ✅ 新增：監聽登入結果
   useEffect(() => {
+    // 1. 新增：偵測瀏覽器「上一頁」行為
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        // 如果頁面是從快取（BFCache）復原過來的，強制關閉 Loading 狀態
+        setIsRedirecting(false);
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
     if (state?.success) {
       // 1. 進入跳轉鎖定狀態
-      setIsRedirecting(true);
+      setIsRedirecting(true); // 🚀 登入成功，立刻鎖定畫面進入跳轉狀態
 
       // 2. 寫入 sessionStorage 與 Cookie (比照租戶登入邏輯)
       if (state.sessionId) {
@@ -74,6 +82,10 @@ export default function Home() {
       // 3. 執行整頁跳轉（這時畫面會維持 Loading 直到 Dashboard 渲染完成）
       window.location.href = state.redirectTo || '/dashboard';
     }
+    // 3. 新增：元件卸載時移除監聽器
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+    };
   }, [state]);
   // 🚀 整合「點擊送出中」與「成功後跳轉中」的總載入狀態
   const showLoading = isPending || isRedirecting;
