@@ -149,7 +149,7 @@ export default function Home() {
             type="submit"
             disabled={showLoading} // ✅ 防止重複提交
             className={`w-full rounded-xl py-4 font-bold text-white transition-all shadow-lg ${
-              isPending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-200'
+              showLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-200'
             }`}
           >
             {showLoading ? t.loading : t.signIn}
