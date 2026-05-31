@@ -26,30 +26,33 @@ export async function middleware(request: NextRequest) {
   // 🐞 Debug: 印出動態變量幫助排查
   console.log(`🐞 middleware [${targetTenant}] 嘗試讀取 Cookie: ${cookieName} =`, sessionId);
   const session = sessionId ? await getSession(sessionId) : null;
-  const authTenant = session?.tenant;
+  // 🚨 【修正處】絕對不要在 session 為 null 時預設成 'public'！
+  // 如果沒有 session，authTenant 就必須是 null，代表該租戶未登入。
+  const authTenant = session ? session.tenant : null;
   // 🐞 Debug: 印出 URL 與判斷結果
   console.log(`🐞 Middleware 檢查: path=${pathname}, target=${targetTenant}, auth=${authTenant}`);
   // ✅ 重要修正：如果已經帶有 pending_switch 參數，說明已經在處理跳轉中，放行讓 TenantGuard 處理
   // --- 🚀 [最新修改處]：前端鎖定 Handshake 機制 ---
   // 當使用者進入 Dashboard，如果 URL 沒有同步標記，強制重導向帶上標記
   // 這確保了如果是「新分頁貼上網址」，一定會經過 TenantGuard 的 useEffect 檢查
-  if (isDashboardArea && 
-      !searchParams.has('check_sync')) {
-    const url = request.nextUrl.clone();
-    url.searchParams.set('check_sync', '1');
-    return NextResponse.redirect(url);
-  }
+  // if (isDashboardArea && 
+  //     !searchParams.has('check_sync')) {
+  //   const url = request.nextUrl.clone();
+  //   url.searchParams.set('check_sync', '1');
+  //   return NextResponse.redirect(url);
+  // }
 
   // --- 🚀 [最新修改處 2]：簡化權限邏輯 (移除 pending_switch,retry) ---
   
-  // 規則 A：訪問 Dashboard 區域時
+  // 規則 A：訪問 Dashboard 區域時的嚴格守衛
   if (isDashboardArea) {
     // 沒登入，或是登入的租戶與目標不符
     if (!session || authTenant !== targetTenant) {
       const origin = request.nextUrl.origin;
       const loginPage = targetTenant === 'public' ? new URL('/', origin) : new URL(`/${targetTenant}`, origin);
-      // // 加上 retry 避免極端情況下的無限循環
-      // if (!searchParams.has('retry')) loginPage.searchParams.set('retry', '1');
+      // 💡 加上 force_login 讓前端 Guard 知道這是被 Middleware 攔截踢回來的
+      loginPage.searchParams.set('force_login', '1');
+      console.log(`❌ Middleware 攔截：未授權存取 ${targetTenant}，重新導向至 ${loginPage.pathname}`);
       return NextResponse.redirect(loginPage);
     }
   }
@@ -57,15 +60,13 @@ export async function middleware(request: NextRequest) {
   // 此時即便有 Cookie，也絕對不要自動導向 Dashboard
   const isForcedLogin = searchParams.has('force_login');
   // 規則 B：訪問登入頁時，如果已經登入該租戶，直接進 Dashboard
-  if (isLoginPage && authTenant === targetTenant) {
+  if (isLoginPage && authTenant === targetTenant && !isForcedLogin) {
     // 如果不是被強制踢回來的，才執行自動登入跳轉
-    if (!isForcedLogin) {
-      console.log("🐞 middleware: 有 Cookie，自動導向 Dashboard");
-      const origin = request.nextUrl.origin;
-      const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
-      return NextResponse.redirect(new URL(currentDash, origin));
-    }
+    console.log("🐞 middleware: 有 Cookie，自動導向 Dashboard");
+    const origin = request.nextUrl.origin;
+    const currentDash = authTenant === 'public' ? '/dashboard' : `/${authTenant}/dashboard`;
     console.log("🐞 middleware: 偵測到 force_login 標記，停留在登入頁");
+    return NextResponse.redirect(new URL(currentDash, origin));
   }
 
   return NextResponse.next();
