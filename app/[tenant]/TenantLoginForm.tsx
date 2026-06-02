@@ -11,11 +11,14 @@ export default function TenantLoginForm({ tenant }: { tenant: string }) {
   const [isRedirecting, setIsRedirecting] = useState(false);
   // ✅ 新增：處理分頁獨立 Session 邏輯
   useEffect(() => {
-    if (state?.success && state.sessionId) {
+    if (state?.success) {
       // 1. 開啟跳轉鎖定，確保 Loading 訊息持續顯示到新頁面載入完成
       setIsRedirecting(true);
-      // 2. 存入該分頁特有的 sessionStorage
-      sessionStorage.setItem('tab_session_id', state.sessionId);
+      // 🟢【修改】根據當前租戶動態設定 sessionStorage Key (例如 session_tenant1)
+      if (state.sessionId && tenant) {
+        // 2. 存入該分頁特有的 sessionStorage
+        sessionStorage.setItem('tab_session_id', state.sessionId);
+      }
       window.location.href = state.redirectTo || (tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard`);
     }
   }, [state, tenant]);

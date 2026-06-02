@@ -190,13 +190,16 @@ import { redirect } from 'next/navigation';
     // ✅ 2.我們改為回傳結果給前端，讓前端處理 sessionStorage 與同步
     return { 
       success: true, 
-      sessionId, 
-      tenant: 'public',
+      error: null,
+      sessionId: sessionId, // 🚩 重要：讓前端接收到後，能執行 sessionStorage.setItem('session_public', ...)
       redirectTo: '/dashboard' 
     };
   } else {
     // 驗證失敗
     // ✅ 失敗時不 redirect，直接回傳錯誤訊息給前端
-    return { error: "帳號或密碼錯誤，請重新輸入。" };
-  }
+    return { success: false,
+             sessionId: null,
+             error: "帳號或密碼錯誤，請重新輸入。" 
+            };
+    }
   }

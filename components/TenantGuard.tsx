@@ -9,18 +9,19 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    // 🟢【新增】1. 撈取該分頁獨立的 sessionStorage
-    const sid = sessionStorage.getItem('tab_session_id');
+    // 🟢【核心修改】根據當前頁面的租戶，動態讀取專屬的 sessionStorage Key
+    const cookieName = currentTenant === 'public' ? 'session_public' : `session_${currentTenant}`;
+    const sid = sessionStorage.getItem(cookieName);
 
     // 🟢【新增】2. 核心防禦：如果沒值，代表此分頁是新開的（或未登入），立刻踢回該租戶的登入頁
     if (!sid) {
-      console.warn("❌ 分頁無 Session 紀錄，安全引導至登入頁");
+      console.warn("❌ 分頁無租戶 [${currentTenant}] 的 Session 紀錄，安全引導至登入頁");
       const loginPath = currentTenant === 'public' ? '/' : `/${currentTenant}`;
       
       // 使用 window.location.replace 確保瀏覽器歷史紀錄不會留下 Dashboard 錯誤頁
       window.location.replace(loginPath);
     } else {
-      // 🟢【新增】3. 有值則通過驗證，允許顯示 Dashboard 內容
+      // 🟢【新增】3. 有值且對應租戶正確，允許顯示 Dashboard 內容
       setIsAuthorized(true);
     }
   }, [currentTenant]);

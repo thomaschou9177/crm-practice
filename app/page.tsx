@@ -62,7 +62,7 @@ export default function Home() {
 
       // 2. 寫入 sessionStorage (比照租戶登入邏輯)
       if (state.sessionId) {
-        sessionStorage.setItem('tab_session_id', state.sessionId);
+        sessionStorage.setItem('session_public', state.sessionId);
       }
 
       // 3. 執行整頁跳轉（這時畫面會維持 Loading 直到 Dashboard 渲染完成）
