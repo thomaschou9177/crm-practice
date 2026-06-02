@@ -16,8 +16,10 @@ export default function TenantLoginForm({ tenant }: { tenant: string }) {
       setIsRedirecting(true);
       // 🟢【修改】根據當前租戶動態設定 sessionStorage Key (例如 session_tenant1)
       if (state.sessionId && tenant) {
+        // 根據當前動態網址的租戶名稱，組合出專屬的 Key (例如 session_tenant1)
+        const keyName = tenant === 'public' ? 'session_public' : `session_${tenant}`;
         // 2. 存入該分頁特有的 sessionStorage
-        sessionStorage.setItem('tab_session_id', state.sessionId);
+        sessionStorage.setItem(keyName, state.sessionId);
       }
       window.location.href = state.redirectTo || (tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard`);
     }
