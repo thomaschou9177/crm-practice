@@ -10,15 +10,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   // 自動解析 URL 第一段作為 tenant
+  // 1. 自動解析 URL 第一段作為當前目標 tenant
   const segments = pathname.split('/').filter(Boolean); // e.g. "/tenant3/dashboard" → ["tenant3","dashboard"]
   // let targetTenant = segments[0] || 'public';
   // if (targetTenant === 'dashboard') targetTenant = 'public';
   const targetTenant = (segments[0] === 'dashboard') ? 'public' : segments[0];
-  // 定義 Dashboard 與 登入頁 判斷
+  // 2.定義 Dashboard 與 登入頁 判斷
   const isDashboardArea = pathname.includes('/dashboard');
   const isLoginPage = (targetTenant === 'public' && pathname === '/') || 
                       (targetTenant !== 'public' && pathname === `/${targetTenant}`);
-  // 🚀 【更靈活的寫法】動態掃描所有 session 開頭的 Cookie
+  // 🚀 【跨租戶自動登出機制】動態掃描所有 session 開頭的 Cookie
   const allCookies = request.cookies.getAll();
   let responseToUse: NextResponse | null = null;
 
@@ -44,6 +45,7 @@ export async function middleware(request: NextRequest) {
   // 🚀 [修改點]：根據租戶區分 Cookie 名稱 (若你打算實作租戶隔離)
   // 或者統一使用 sessionId，但由 TenantGuard 驗證 sessionStorage
   // 如果是 public 租戶，找 session_public；如果是 tenant1，找 session_tenant1
+  // 3. 讀取當前目標租戶專屬的 Cookie 與 Session
   const cookieName = targetTenant === 'public' ? 'session_public' : `session_${targetTenant}`;
   const sessionId = request.cookies.get(cookieName)?.value;
   // 🐞 Debug: 印出動態變量幫助排查
@@ -54,16 +56,18 @@ export async function middleware(request: NextRequest) {
   const authTenant = session ? session.tenant : null;
   // 🐞 Debug: 印出 URL 與判斷結果
   console.log(`🐞 Middleware 檢查: path=${pathname}, target=${targetTenant}, auth=${authTenant}`);
-  // ✅ 重要修正：如果已經帶有 pending_switch 參數，說明已經在處理跳轉中，放行讓 TenantGuard 處理
-  // --- 🚀 [最新修改處]：前端鎖定 Handshake 機制 ---
-  // 當使用者進入 Dashboard，如果 URL 沒有同步標記，強制重導向帶上標記
-  // 這確保了如果是「新分頁貼上網址」，一定會經過 TenantGuard 的 useEffect 檢查
-  // if (isDashboardArea && 
-  //     !searchParams.has('check_sync')) {
-  //   const url = request.nextUrl.clone();
-  //   url.searchParams.set('check_sync', '1');
-  //   return NextResponse.redirect(url);
-  // }
+  // 4. 新分頁檢測的第一步重導向 (由您原本代碼保留優化)
+  if (isDashboardArea && !searchParams.has('check_sync')) {
+    const url = request.nextUrl.clone();
+    url.searchParams.set('check_sync', '1');
+    const redirectCheckResponse = NextResponse.redirect(url);
+    if (responseToUse) {
+      responseToUse.cookies.getAll().forEach(cookie => {
+        redirectCheckResponse.cookies.set(cookie.name, '', { path: '/', expires: new Date(0) });
+      });
+    }
+    return redirectCheckResponse;
+  }
 
   // --- 🚀 [最新修改處 2]：簡化權限邏輯 (移除 pending_switch,retry) ---
   

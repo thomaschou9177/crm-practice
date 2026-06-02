@@ -15,10 +15,12 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
     const syncSession = () => {
       const sid = sessionStorage.getItem('tab_session_id');
       const hasCheckSync = searchParams.has('check_sync');
+      const cookieName = currentTenant === 'public' ? 'session_public' : `session_${currentTenant}`;
       // 🚀 [最新修改處]：處理新分頁貼上網址的情況
       if (!sid && hasCheckSync) {
         console.warn("🔍 偵測到新分頁且無 SessionStorage，安全跳轉...");
-        
+        // 清除由其他分頁共享過來的 Cookie 污染
+        document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
         const origin = window.location.origin;
         const loginPath = currentTenant === 'public' ? '/' : `/${currentTenant}`;
         const loginUrl = new URL(loginPath, origin);
@@ -30,35 +32,32 @@ export default function TenantGuard({ currentTenant }: { currentTenant: string }
         return;
       }
 
-      // ✅ 正常刷新或合法進入：從 sessionStorage 恢復 Cookie
-      // document.cookie = `sessionId=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
-      
-      // 🚀 新增以下程式碼：使用租戶專屬 Cookie 名稱
-      const cookieName = `session_${currentTenant}`;
-      document.cookie = `${cookieName}=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
+      // ✅ 2. 【保留並優化】正常刷新或合法進入：由 sessionStorage 恢復/維持 Cookie 狀態
+      if (sid) {
+        document.cookie = `${cookieName}=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
 
-      // 🚀 清理 URL 上的輔助參數
-      const params = new URLSearchParams(searchParams.toString());
-      const needsCleanup = 
-        params.has('check_sync') ||
-        params.has('retry') || 
-        params.has('auth_tenant') || 
-        params.has('pending_switch')|| 
-        params.has('target_tenant');
+        // 🚀 清理 URL 上的輔助參數
+        const params = new URLSearchParams(searchParams.toString());
+        const needsCleanup = 
+          params.has('check_sync') ||
+          params.has('retry') || 
+          params.has('auth_tenant') || 
+          params.has('pending_switch')|| 
+          params.has('target_tenant');
 
-      if (needsCleanup) {
-        params.delete('check_sync');
-        params.delete('retry');
-        params.delete('auth_tenant');
-        params.delete('pending_switch');
-        params.delete('target_tenant');
+        if (needsCleanup) {
+          params.delete('check_sync');
+          params.delete('retry');
+          params.delete('auth_tenant');
+          params.delete('pending_switch');
+          params.delete('target_tenant');
 
-        const newSearch = params.toString();
-        const cleanPath = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-        window.history.replaceState(null, '', cleanPath);
+          const newSearch = params.toString();
+          const cleanPath = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+          window.history.replaceState(null, '', cleanPath);
+        }
       }
     };
-
     syncSession();
   }, [searchParams, currentTenant]);
 
