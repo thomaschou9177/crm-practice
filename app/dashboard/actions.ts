@@ -3,7 +3,6 @@
 import { prisma } from '@/lib/db';
 import { createSession, destroySession } from '@/lib/session';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
@@ -13,16 +12,11 @@ import { redirect } from 'next/navigation';
 
   // 🚀 新增：接收來自前端 TenantGuard 的特定 sessionId
   const sessionIdFromForm = formData.get('sessionId')?.toString();
-  const cookieStore = await cookies();
-  // const sessionId = cookieStore.get('sessionId')?.value;
-
   if (sessionIdFromForm) {
     // 如果後端有 session store，在這裡銷毀它
     await destroySession(sessionIdFromForm); 
+    console.log(`🚀 public：已成功銷毀資料庫 Session: ${sessionIdFromForm}`)
   }
-
-  cookieStore.delete('sessionId');
-
   // 導向首頁
   redirect(tenant === 'public' ? '/' : `/${tenant}`);
 }
@@ -138,7 +132,6 @@ import { redirect } from 'next/navigation';
         params.delete(key); // 如果清空輸入框，就移除該參數
       }
     });
-    // 取得隱藏欄位中的租戶資訊或從 cookie 判斷
     // 如果是 public，導向 /dashboard；否則導向 /tenant/dashboard
     // 這裡建議在 page.tsx 的 form 傳入一個 hidden tenant 欄位
     const tenant = formData.get("tenant")?.toString() || "public";
@@ -160,7 +153,6 @@ import { redirect } from 'next/navigation';
         params.delete(key); // 如果清空輸入框，就移除該參數
       }
     });
-    // 取得隱藏欄位中的租戶資訊或從 cookie 判斷
     // 如果是 public，導向 /dashboard；否則導向 /tenant/dashboard
     // 這裡建議在 page.tsx 的 form 傳入一個 hidden tenant 欄位
     const tenant = formData.get("tenant")?.toString() || "public";
@@ -194,14 +186,6 @@ import { redirect } from 'next/navigation';
       tenant: 'public',
       isLoggedIn: true,
       user: { name: user.username }
-    });
-    // 🚀 新增：在 Server 端先寫入 Session Cookie，輔助第一次跳轉
-    const cookieStore = await cookies();
-    cookieStore.set('sessionId', sessionId, {
-      path: '/',
-      httpOnly: false, // 必須為 false，讓前端 JavaScript 能讀取並存入 sessionStorage
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
     });
     // ✅ 2.我們改為回傳結果給前端，讓前端處理 sessionStorage 與同步
     return { 

@@ -50,50 +50,37 @@ const translations = {
 export default function Home() {
   // const router = useRouter(); // Initialize router
   const [lang, setLang] = useState<'en' | 'zh' | 'jp'>('en');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [state, formAction, isPending] = useActionState(loginPublic, null);
   const t = translations[lang];
   // 🚀 新增一個狀態：用來鎖定「正在跳轉中」的畫面，防止 Server Action 結束後提示字消失
   const [isRedirecting, setIsRedirecting] = useState(false);
   // ✅ 新增：監聽登入結果
   useEffect(() => {
-    // 1. 新增：偵測瀏覽器「上一頁」行為
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        // 如果頁面是從快取（BFCache）復原過來的，強制關閉 Loading 狀態
-        setIsRedirecting(false);
-      }
-    };
-    window.addEventListener('pageshow', handlePageShow);
     if (state?.success) {
       // 1. 進入跳轉鎖定狀態
       setIsRedirecting(true); // 🚀 登入成功，立刻鎖定畫面進入跳轉狀態
 
-      // 2. 寫入 sessionStorage 與 Cookie (比照租戶登入邏輯)
+      // 2. 寫入 sessionStorage (比照租戶登入邏輯)
       if (state.sessionId) {
         sessionStorage.setItem('tab_session_id', state.sessionId);
-        document.cookie = `session_public=${state.sessionId}; path=/; SameSite=Lax; ${
-          window.location.protocol === 'https:' ? 'Secure' : ''
-        }`;
       }
 
       // 3. 執行整頁跳轉（這時畫面會維持 Loading 直到 Dashboard 渲染完成）
       window.location.href = state.redirectTo || '/dashboard';
     }
-    // 3. 新增：元件卸載時移除監聽器
-    return () => {
-      window.removeEventListener('pageshow', handlePageShow);
-    };
   }, [state]);
-  // 🚀 整合「點擊送出中」與「成功後跳轉中」的總載入狀態
-  const showLoading = isPending || isRedirecting;
+  // 當驗證失敗、Server Action 判定錯誤時，關閉 Loading 狀態
+  useEffect(() => {
+    if (state?.error) {
+      setIsRedirecting(false);
+    }
+  }, [state?.error]);
+  
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       
       {/* 🚀 全畫面覆蓋的「登入中請等待」毛玻璃特效層 */}
-      {showLoading && (
+      {isRedirecting && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/70 backdrop-blur-md transition-all duration-300">
           <div className="flex flex-col items-center space-y-4">
             {/* 這裡放一個精美的 CSS 載入動畫圈圈 */}
@@ -159,12 +146,12 @@ export default function Home() {
 
           <button 
             type="submit"
-            disabled={showLoading} // ✅ 防止重複提交
+            disabled={isRedirecting} // ✅ 防止重複提交
             className={`w-full rounded-xl py-4 font-bold text-white transition-all shadow-lg ${
-              showLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-200'
+              isRedirecting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-blue-200'
             }`}
           >
-            {showLoading ? t.loading : t.signIn}
+            {isRedirecting ? t.loading : t.signIn}
           </button>
         </form>
 

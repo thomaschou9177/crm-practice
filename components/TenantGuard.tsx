@@ -1,119 +1,42 @@
 // components/TenantGuard.tsx
 "use client";
-import { handleLogout } from "@/app/dashboard/actions";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function TenantGuard({ currentTenant }: { currentTenant: string }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const formRef = useRef<HTMLFormElement>(null);
-  const isNavigatingRef = useRef(false);
+  // 🟢【新增】控制是否驗證通過的狀態，用來做前端防閃爍遮罩
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
-  // --- 邏輯 A：Session 同步與「新分頁」攔截 ---
   useEffect(() => {
-    const syncSession = () => {
-      const sid = sessionStorage.getItem('tab_session_id');
-      const hasCheckSync = searchParams.has('check_sync');
-      const cookieName = currentTenant === 'public' ? 'session_public' : `session_${currentTenant}`;
-      // 🚀 [最新修改處]：處理新分頁貼上網址的情況
-      if (!sid && hasCheckSync) {
-        console.warn("🔍 偵測到新分頁且無 SessionStorage，安全跳轉...");
-        // 清除由其他分頁共享過來的 Cookie 污染
-        document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
-        const origin = window.location.origin;
-        const loginPath = currentTenant === 'public' ? '/' : `/${currentTenant}`;
-        const loginUrl = new URL(loginPath, origin);
-        
-        // 加上 force_login 告訴 Middleware：別再把我導回 Dashboard 了！
-        loginUrl.searchParams.set('force_login', '1');
-        
-        window.location.replace(loginUrl.toString());
-        return;
-      }
+    // 🟢【新增】1. 撈取該分頁獨立的 sessionStorage
+    const sid = sessionStorage.getItem('tab_session_id');
 
-      // ✅ 2. 【保留並優化】正常刷新或合法進入：由 sessionStorage 恢復/維持 Cookie 狀態
-      if (sid) {
-        document.cookie = `${cookieName}=${sid}; path=/; SameSite=Lax; ${process.env.NODE_ENV === 'production' ? 'Secure' : ''}`;
-
-        // 🚀 清理 URL 上的輔助參數
-        const params = new URLSearchParams(searchParams.toString());
-        const needsCleanup = 
-          params.has('check_sync') ||
-          params.has('retry') || 
-          params.has('auth_tenant') || 
-          params.has('pending_switch')|| 
-          params.has('target_tenant');
-
-        if (needsCleanup) {
-          params.delete('check_sync');
-          params.delete('retry');
-          params.delete('auth_tenant');
-          params.delete('pending_switch');
-          params.delete('target_tenant');
-
-          const newSearch = params.toString();
-          const cleanPath = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-          window.history.replaceState(null, '', cleanPath);
-        }
-      }
-    };
-    syncSession();
-  }, [searchParams, currentTenant]);
-
-
-  // // --- 邏輯 B：租戶切換監控 (選擇「否」的回航) ---
-  // useEffect(() => {
-  //   const pendingSwitch = searchParams.get('pending_switch');
-  //   if (pendingSwitch === 'true') {
-  //     const targetTenant = searchParams.get('target_tenant');
-  //     const authTenant = searchParams.get('auth_tenant');
+    // 🟢【新增】2. 核心防禦：如果沒值，代表此分頁是新開的（或未登入），立刻踢回該租戶的登入頁
+    if (!sid) {
+      console.warn("❌ 分頁無 Session 紀錄，安全引導至登入頁");
+      const loginPath = currentTenant === 'public' ? '/' : `/${currentTenant}`;
       
-  //     const confirmed = window.confirm(
-  //       `您目前登入於 ${authTenant}，是否切換至 ${targetTenant}? (此操作將登出目前帳號)`
-  //     );
+      // 使用 window.location.replace 確保瀏覽器歷史紀錄不會留下 Dashboard 錯誤頁
+      window.location.replace(loginPath);
+    } else {
+      // 🟢【新增】3. 有值則通過驗證，允許顯示 Dashboard 內容
+      setIsAuthorized(true);
+    }
+  }, [currentTenant]);
 
-  //     if (confirmed && formRef.current) {
-  //       // 選「是」：正常提交 form 登出並轉換
-  //       isNavigatingRef.current = true;
-  //       const sid = sessionStorage.getItem('tab_session_id');
-  //       const sidInput = formRef.current.querySelector('input[name="sessionId"]') as HTMLInputElement;
-  //       if (sidInput && sid) sidInput.value = sid;
-        
-  //       // 準備跳轉前清除目前的 sid，因為要登入新租戶了
-  //       sessionStorage.removeItem('tab_session_id');
-  //       formRef.current.requestSubmit();
-  //     } else {
-  //       // --- 選擇「否」：直接跳回原租戶 Dashboard ---
-  //       const originalTenant = authTenant || currentTenant;
-  //       const path = originalTenant === "public" ? "/dashboard" : `/${originalTenant}/dashboard`;
-        
-  //       const returnUrl = new URL(path, window.location.origin);
-  //       // 帶上 auth_tenant 讓 Middleware 放行一次，隨後由邏輯 A 接手恢復
-  //       returnUrl.searchParams.set('auth_tenant', originalTenant as string);
+  // 🟢【新增】3. 在前端 JS 還沒驗證完畢前（約 0.02 秒），用全螢幕遮罩擋住，防止 SSR 畫面外洩或閃爍
+  if (!isAuthorized) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center space-y-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          <p className="text-sm font-medium text-gray-500">正在驗證分頁安全憑證...</p>
+        </div>
+      </div>
+    );
+  }
 
-  //       // 🚀 因為沒有 beforeunload 監聽，這裡 replace 不會觸發任何登出請求
-  //       window.location.replace(returnUrl.toString());
-  //     }
-  //   }
-  // }, [searchParams, currentTenant]);
-
-
-  // --- 邏輯 C：已移除 beforeunload 監聽 ---
-  // 不再主動發送 navigator.sendBeacon
-  useEffect(() => {
-    console.log("🐞 TenantGuard: Active - 移除 beforeunload 監聽器以優化刷新體驗");
-  }, []);
-
-  return (
-    <form ref={formRef} action={handleLogout} style={{ display: "none" }}>
-      <input type="hidden" name="tenant" value={currentTenant} />
-      <input type="hidden" name="sessionId" value="" />
-      <input
-        type="hidden"
-        name="target_tenant"
-        value={searchParams.get("target_tenant") || ""}
-      />
-    </form>
-  );
+  // ✅ 驗證通過，不渲染任何遮罩，讓下方的 Dashboard 內容正常顯示
+  return null;
 }

@@ -4,7 +4,6 @@
 import { getPrismaClient } from '@/lib/db';
 import { createSession, destroySession } from '@/lib/session';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
  // --- SERVER ACTIONS ---
 
@@ -12,20 +11,13 @@ import { redirect } from 'next/navigation';
   const tenant = formData.get('tenant')?.toString() || 'public';
   // ✅ 從表單獲取隱藏的 sessionId
   const sessionId = formData.get('sessionId')?.toString(); 
-
-  const cookieStore = await cookies();
   
   if (sessionId) {
     await destroySession(sessionId); // 刪除資料庫紀錄[cite: 12]
+    console.log(`🚀 已成功銷毀資料庫 Session: ${sessionId}`);
   }else {
-    // 備援方案：如果沒傳 sid，嘗試從 cookie 抓取 (雖然多分頁下不夠精準)
-    const cookieSid = cookieStore.get('sessionId')?.value;
-    if (cookieSid) await destroySession(cookieSid);
+    console.warn("⚠️ 登出時未收到有效的 sessionId");
   }
-
-  // ✅ 2. 清除 Cookie
-  cookieStore.delete('sessionId');
-
   redirect(tenant === 'public' ? '/' : `/${tenant}`);
 }
 
@@ -223,20 +215,9 @@ const TENANT_USERS: Record<string, { username: string; password: string }[]> = {
       isLoggedIn: true,
       user: { name: user.username }
     });
-    // 🚀 [新增] 登入成功時，先在 Server 端寫入一次 Cookie
-    // 這樣在之後的 redirect 過程中，Middleware 就能立刻識別身分
-    const cookieStore = await cookies();
-    cookieStore.set('sessionId', sessionId, {
-      path: '/',
-      httpOnly: false, // 設為 false 才能讓前端 TenantGuard 讀取/清理
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-    });
-    
     return { 
       success: true, 
-      sessionId, // 🚩 重要：回傳給前端存入 sessionStorage
-      tenant,
+      sessionId:sessionId, // 🚩 重要：回傳給前端存入 sessionStorage
       redirectTo: tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard` 
     };
   } else {

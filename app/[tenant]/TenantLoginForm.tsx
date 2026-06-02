@@ -16,19 +16,6 @@ export default function TenantLoginForm({ tenant }: { tenant: string }) {
       setIsRedirecting(true);
       // 2. 存入該分頁特有的 sessionStorage
       sessionStorage.setItem('tab_session_id', state.sessionId);
-      
-      // 🚀 [建議修改處]：使用「租戶專屬」的 Cookie 名稱
-      // 這樣當 tenant1 登入時，不會蓋掉 public 的 session Cookie
-      const cookieName = `session_${tenant}`;
-
-      // 2. 同步到 Cookie 供 Middleware 驗證 (Session Cookie 模式)
-      document.cookie = `${cookieName}=${state.sessionId}; path=/; SameSite=Lax; ${
-        window.location.protocol === 'https:' ? 'Secure' : ''
-      }`;
-
-      // 3. 導向該租戶的 Dashboard
-      // 建議使用 window.location.href 而不是 router.push 
-      // 這樣可以確保整頁重新載入，讓 Middleware 重新執行並抓到最新的 Cookie
       window.location.href = state.redirectTo || (tenant === 'public' ? '/dashboard' : `/${tenant}/dashboard`);
     }
   }, [state, tenant]);
