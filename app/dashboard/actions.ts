@@ -166,7 +166,7 @@ import { redirect } from 'next/navigation';
 
   // 定義帳號清單
   const PUBLIC_USERS = [
-    { username: "admin", password: "password123" },
+    { username: "admin", password: "admin123" },
     { username: "user", password: "user123" },
     { username: "test", password: "test123" },
   ];

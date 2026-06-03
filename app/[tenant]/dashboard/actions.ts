@@ -186,14 +186,19 @@ import { redirect } from 'next/navigation';
   // 定義帳號清單 (對應你的要求)
 const TENANT_USERS: Record<string, { username: string; password: string }[]> = {
   tenant1: [
-    { username: "tenant1admin", password: "t1password123" },
+    { username: "tenant1admin", password: "t1admin123" },
     { username: "tenant1user", password: "t1user123" },
     { username: "tenant1test", password: "t1test123" },
   ],
   tenant2: [
-    { username: "tenant2admin", password: "t2password123" },
+    { username: "tenant2admin", password: "t2admin123" },
     { username: "tenant2user", password: "t2user123" },
     { username: "tenant2test", password: "t2test123" },
+  ],
+  tenant3: [
+    { username: "tenant3admin", password: "t3admin123" },
+    { username: "tenant3user", password: "t3user123" },
+    { username: "tenant3test", password: "t3test123" },
   ],
   // 可以依此類推...
 };
