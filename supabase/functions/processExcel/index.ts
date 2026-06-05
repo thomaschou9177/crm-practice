@@ -45,17 +45,32 @@ Deno.serve(async (req) => {
       Object.keys(c).forEach((key) => {
         if (!fixedKeys.includes(key)) metadata[key] = c[key];
       });
-      return { id: c.id, name: c.name, email: c.email, role: c.role, metadata };
+      return { name: c.name, email: c.email, role: c.role, metadata };
     });
 
-    const infoPayload = infos.map((i: any) => ({ id: i.id, email: i.email }));
+    // 1. 🟢 修改：寫入 customer 時加上 .select()，這樣能把 PostgreSQL 自動生成的 id 撈回來！
+    const { data: insertedCustomers, error: customerError } = await supabase
+      .from("customer")
+      .upsert(customerPayload, { onConflict: 'email' }) // 依據 email 判定重複
+      .select("id, email"); // 👈 關鍵：把新生成的 id 與 email 抓出來
 
-    // Upsert Customer(此時會自動作用於 targetSchema)
-    const { error: customerError } = await supabase.from("customer").upsert(customerPayload);
     if (customerError) throw customerError;
 
-    // Upsert Info
-    const { error: infoError } = await supabase.from("customer_info").upsert(infoPayload);
+    // 2. 🟢 修改：利用剛剛拿到的最新一對一 id，來建立對應的 infoPayload
+    const infoPayload = insertedCustomers.map((inserted) => {
+      // 在 infos 陣列中尋找 email 相同的那筆原始資料（用來保留可能存在的其他 info 欄位）
+      // 這裡確保 customer_info 的 id 一定能精準對上 customer 表剛產生的自增 id！
+      return {
+        id: inserted.id, // 👈 100% 正確的安全外鍵 id
+        email: inserted.email
+      };
+    });
+
+    // 3. Upsert Info
+    const { error: infoError } = await supabase
+      .from("customer_info")
+      .upsert(infoPayload, { onConflict: 'id' }); // 依據外鍵主鍵判定重複
+      
     if (infoError) throw infoError;
 
     return new Response(
