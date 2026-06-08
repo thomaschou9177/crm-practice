@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       Object.keys(c).forEach((key) => {
         if (!fixedKeys.includes(key)) metadata[key] = c[key];
       });
-      return { name: c.name, email: c.email, role: c.role, metadata };
+      return { id: c.id,name: c.name, email: c.email, role: c.role, metadata };
     });
 
     // 1. 🟢 修改：寫入 customer 時加上 .select()，這樣能把 PostgreSQL 自動生成的 id 撈回來！
