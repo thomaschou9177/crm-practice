@@ -56,22 +56,20 @@ Deno.serve(async (req) => {
 
     if (customerError) throw customerError;
 
-    // 2. 🟢 修改：利用剛剛拿到的最新一對一 id，來建立對應的 infoPayload
-    const infoPayload = insertedCustomers.map((inserted) => {
-      // 在 infos 陣列中尋找 email 相同的那筆原始資料（用來保留可能存在的其他 info 欄位）
-      // 這裡確保 customer_info 的 id 一定能精準對上 customer 表剛產生的自增 id！
-      return {
-        id: inserted.id, // 👈 100% 正確的安全外鍵 id
+    // 2. 利用剛剛成功寫入後，資料庫分配/找到的正確主鍵 id，建立 info 關聯
+    if (insertedCustomers && insertedCustomers.length > 0) {
+      const infoPayload = insertedCustomers.map((inserted) => ({
+        id: inserted.id, // 精準對齊的外鍵 id
         email: inserted.email
-      };
-    });
+      }));
 
-    // 3. Upsert Info
-    const { error: infoError } = await supabase
-      .from("customer_info")
-      .upsert(infoPayload, { onConflict: 'id' }); // 依據外鍵主鍵判定重複
-      
-    if (infoError) throw infoError;
+      // 3. 寫入 customer_info，以 id (主鍵) 作為重複判定
+      const { error: infoError } = await supabase
+        .from("customer_info")
+        .upsert(infoPayload, { onConflict: 'id' });
+        
+      if (infoError) throw infoError;
+    }
 
     return new Response(
       JSON.stringify({ success: true, batchIndex }),
