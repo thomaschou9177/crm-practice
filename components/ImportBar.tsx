@@ -21,6 +21,7 @@ export default function ImportBar() {
   const [totalRows, setTotalRows] = useState<number>(0);
   const [processedRows, setProcessedRows] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [appendIfDuplicate, setAppendIfDuplicate] = useState<boolean>(false); // 🟢 新增：是否在重複時加到最後
 
   const batchSize = 5000;
   const parallelLimit = 3;
@@ -31,12 +32,15 @@ export default function ImportBar() {
         body: { batchIndex, 
                 customers, 
                 infos,
-                tenant: tenant || 'public'  },
+                tenant: tenant || 'public',
+                appendIfDuplicate // 🟢 關鍵：將使用者的抉擇傳遞給後端 Edge Function
+              },
       });
 
       if (error) {
         console.error("Batch upload failed:", error);
         alert("Batch upload failed, check console logs.");
+        throw error; // 這裡 throw 會中斷後續的 Promise.all，達到「取消這次動作」的效果
       } else {
         setProcessedRows((prev) => prev + customers.length);
       }
@@ -134,6 +138,18 @@ export default function ImportBar() {
   return (
     <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-4 flex flex-col gap-2">
       <h2 className="font-bold text-green-700 uppercase">Import Excel/CSV File</h2>
+      {/* 🟢 新增：行為決策勾選方塊 */}
+      <label className="flex items-center gap-2 text-sm text-gray-700 my-1 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={appendIfDuplicate}
+          onChange={(e) => setAppendIfDuplicate(e.target.checked)}
+          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+        />
+        <span className="font-medium">
+          若 ID 與資料庫重複時，<span className="text-green-600 font-bold">自動忽略 Excel ID 並加在最後面</span>（未勾選則自動取消動作並報錯）
+        </span>
+      </label>
       <div className="flex gap-2">
         <input
           type="file"
