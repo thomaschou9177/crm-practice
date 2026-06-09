@@ -68,6 +68,15 @@ export default function ImportBar() {
         });
         return normalized;
       });
+      // ========================================================
+      // 🟢【新增】對 CSV 讀取出的 rows 進行資料清洗，確保 id 為純整數
+      // ========================================================
+      rows = rows.map((row) => {
+        if (row.id !== null && row.id !== undefined && row.id !== "") {
+          row.id = Math.floor(Number(row.id));
+        }
+        return row;
+      });
     } else if (ext === "xlsx" || ext === "xls") {
       const arrayBuffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
@@ -87,8 +96,11 @@ export default function ImportBar() {
         const idValue = row.getCell(colMap["id"]).value;
         if (idValue === null || idValue === undefined) continue;
 
+        // ========================================================
+        // 🟢【新增】修改後的 fixed 組裝方式（強制將 id 轉為無小數點的純整數）
+        // ========================================================
         const fixed = {
-          id: Number(idValue),
+          id: Math.floor(Number(idValue)), // 👈 破除 1.0 變浮點數的關鍵
           name: String(row.getCell(colMap["name"]).value || ""),
           email: String(row.getCell(colMap["email"]).value || ""),
           role: String(row.getCell(colMap["role"]).value || ""),
