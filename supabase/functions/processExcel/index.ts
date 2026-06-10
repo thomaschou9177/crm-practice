@@ -66,14 +66,31 @@ Deno.serve(async (req) => {
         return { id: cleanId, name: c.name, email: c.email, role: c.role, metadata };
       }
     });
-    // 🟢 如果有傳入 id (未勾選方塊時)，我們讓 onConflict 依據 'id' 來觸發衝突
-    const conflictTarget = appendIfDuplicate ? 'email' : 'id';
-    // 1. 🟢 修改：寫入 customer 時加上 .select()，這樣能把 PostgreSQL 自動生成的 id 撈回來！
-    const { data: insertedCustomers, error: customerError } = await supabase
-      .from("customer")
-      .upsert(customerPayload, { onConflict: conflictTarget }) // 依據 email 判定重複
-      .select("id, email"); // 👈 關鍵：把新生成的 id 與 email 抓出來
-
+    // ====================================================================
+    // 🟢【新增】全新的「雙軌寫入機制」：完美分流 Upsert 追加與 Insert 嚴格阻斷
+    // ====================================================================
+    let insertedCustomers = null;
+    let customerError = null;
+    if (appendIfDuplicate === true) {
+      // 【情境 A：使用者勾選追加】
+      // 走舊有 upsert 邏輯，主要檢驗 email
+      const res = await supabase
+        .from("customer")
+        .upsert(customerPayload, { onConflict: 'email' })
+        .select("id, email");
+      insertedCustomers = res.data;
+      customerError = res.error;
+    } else {
+      // 【情境 B：使用者未勾選（重複時必須取消並噴錯）】
+      // 核心關鍵：直接改成標準的 .insert()！不給任何轉更新（Update）的退路
+      // 只要 Excel 的 ID 敢跟資料庫重複，PostgreSQL 就會 100% 拋出 customer_pkey 唯一約束錯誤！
+      const res = await supabase
+        .from("customer")
+        .insert(customerPayload)
+        .select("id, email");
+      insertedCustomers = res.data;
+      customerError = res.error;
+    }
     if (customerError) throw customerError;
 
     // 2. 利用剛剛成功寫入後，資料庫分配/找到的正確主鍵 id，建立 info 關聯
