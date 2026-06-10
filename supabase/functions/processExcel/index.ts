@@ -45,6 +45,12 @@ Deno.serve(async (req) => {
       Object.keys(c).forEach((key) => {
         if (!fixedKeys.includes(key)) metadata[key] = c[key];
       });
+      // 🟢 1. 在後端做最後一線的安全檢查，強制確保 c.id 是純整數
+      let cleanId = (c.id !== null && c.id !== undefined) ? Math.floor(Number(c.id)) : null;
+
+      // 如果轉出來不幸是 NaN，設為 null
+      if (Number.isNaN(cleanId)) cleanId = null;
+
       // 🟢 行為分支邏輯
       if (appendIfDuplicate === true) {
         // 【情況 A：使用者勾選追加】
@@ -57,14 +63,15 @@ Deno.serve(async (req) => {
         // 如果這個 id 存在，因爲我們設定的是 .upsert(..., { onConflict: 'email' })
         // 如果 email 沒有重複但 id 重複了，PostgreSQL 就會拋出原汁原味的主鍵唯一性衝突錯誤 (500)
         // 這個錯誤會被內層 catch 抓住並回傳給前端，前端隨即彈出 Alert 視窗並中止其餘批次上傳！
-        return { id: c.id, name: c.name, email: c.email, role: c.role, metadata };
+        return { id: cleanId, name: c.name, email: c.email, role: c.role, metadata };
       }
     });
-
+    // 🟢 如果有傳入 id (未勾選方塊時)，我們讓 onConflict 依據 'id' 來觸發衝突
+    const conflictTarget = appendIfDuplicate ? 'email' : 'id';
     // 1. 🟢 修改：寫入 customer 時加上 .select()，這樣能把 PostgreSQL 自動生成的 id 撈回來！
     const { data: insertedCustomers, error: customerError } = await supabase
       .from("customer")
-      .upsert(customerPayload, { onConflict: 'email' }) // 依據 email 判定重複
+      .upsert(customerPayload, { onConflict: conflictTarget }) // 依據 email 判定重複
       .select("id, email"); // 👈 關鍵：把新生成的 id 與 email 抓出來
 
     if (customerError) throw customerError;
