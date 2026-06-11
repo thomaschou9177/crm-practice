@@ -59,14 +59,19 @@ Deno.serve(async (req) => {
       const totalDuplicates = duplicateRecords.length;
 
       // 拋出客製化的格式化錯誤訊息，以便前端讀取顯示
-      throw new Error(
-        `偵測到 Email 與資料庫重複！\n` +
-        `重疊資料總數：${totalDuplicates} 筆\n` +
-        `資料庫中已佔用此 Email 的客戶 ID 列表：[ ${duplicateIds.join(", ")} ]\n` +
-        `為保護資料結構，已強制中止本次上傳動作。`
+      return new Response(
+        JSON.stringify({
+          success: false, // 👈 告訴前端這是一次失敗的商務邏輯
+          error: `偵測到 Email 與資料庫重複！\n重疊資料總數：${totalDuplicates} 筆\n資料庫中已佔用此 Email 的客戶 ID 列表：[ ${duplicateIds.join(", ")} ]\n為保護資料結構，已強制中止本次上傳動作。`
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
+    // ====================================================================
+    // 🚀 安全過濾通過，開始整理資料 Payload
+    // ====================================================================
+    // 處理資料邏輯...
+    const fixedKeys = ["id", "name", "email", "role"];
     // 🟢【新增自動化步驟】如果是追加模式，先用 Service Role 查出目前資料庫的最大 ID
     let currentMaxId = 0;
     if (appendIfDuplicate === true) {
@@ -80,8 +85,7 @@ Deno.serve(async (req) => {
         currentMaxId = maxData[0].id;
       }
     }
-    // 處理資料邏輯...
-    const fixedKeys = ["id", "name", "email", "role"];
+    
     // 🟢 修改 map 邏輯
     let incrementalId = currentMaxId; // 計數器指針
     const customerPayload = customers.map((c: any) => {
@@ -171,11 +175,8 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     // 🚨 修正：不要用 500，維持 400，這樣前端的 PostgREST Client 才會正確認定它是個可攔截的請求錯誤
     return new Response(
-      JSON.stringify({ error: error.message || String(error) }),
-      { 
-        status: 400, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
+      JSON.stringify({ success: false, error: error.message || String(error) }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

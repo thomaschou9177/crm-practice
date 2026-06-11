@@ -27,83 +27,49 @@ export default function ImportBar() {
   const parallelLimit = 3;
 
   const sendBatch = async (batchIndex: number, customers: any[], infos: any[]) => {
-    try {
-      const { data, error } = await supabase.functions.invoke("processExcel", {
-        body: { 
-          batchIndex, 
-          customers, 
-          infos,
-          tenant: tenant || 'public',
-          appendIfDuplicate 
-        },
-      });
+    const { data, error } = await supabase.functions.invoke("processExcel", {
+      body: { 
+        batchIndex, 
+        customers, 
+        infos,
+        tenant: tenant || 'public',
+        appendIfDuplicate 
+      },
+    });
 
-      // 🟢 進入 Supabase 傳回的錯誤判定
-      if (error) {
-        console.error("Batch upload failed (Supabase Error):", error);
-        
-        let friendlyMessage = "批次上傳失敗，請檢查資料格式。";
-
-        // 🔥 關鍵核心：挖掘被藏在 non-2xx 裡面的真實 Response
-        if (error.context && typeof error.context.response?.json === 'function') {
-          try {
-            const bodyData = await error.context.response.json();
-            if (bodyData && bodyData.error) {
-              friendlyMessage = bodyData.error;
-            }
-          } catch (e) {
-            console.error("解析深層錯誤 JSON 失敗:", e);
-          }
-        } else if (error.message && !error.message.includes("non-2xx")) {
-          friendlyMessage = error.message;
-        }
-
-        // 🎯 彈出最完美的客製化詳細重複報告！
-        alert(`❌ 上傳中斷通知\n\n${friendlyMessage}`);
-        
-        throw error; // 中斷其餘批次
-      } else {
-        setProcessedRows((prev) => prev + customers.length);
-      }
-    } catch (err: any) {
-      console.error("Catch 區塊捕獲錯誤:", err);
-      
-      // 這裡做第二層保險防線：如果在上面 throw error 跑到這，且訊息包含重複提示，就不再重複 alert 彈窗
-      // 如果是用戶完全斷網、或者其他程式語法崩潰，就在此處把原汁原味的訊息顯示出來
-      const isDuplicateAlerted = err?.context || err?.message?.includes("Email 與資料庫重複");
-      
-      if (!isDuplicateAlerted) {
-        alert(`❌ 系統回報錯誤: ${err.message || "未知錯誤"}`);
-      }
-      throw err; 
+    // 1. 先捕捉 Supabase 套件本身的網路或端點異常
+    if (error) {
+      console.error("Supabase invoke error:", error);
+      throw new Error("與後端連線異常，請稍後再試。");
     }
+
+    // 2. 🔥 精準攔截後端回傳的 success: false 業務邏輯報告
+    if (data && data.success === false) {
+      throw new Error(data.error || "批次上傳失敗。");
+    }
+
+    // 3. 成功時才累加 rows
+    setProcessedRows((prev) => prev + customers.length);
   };
 
   const handleProcess = async () => {
     if (!file) return;
     setIsProcessing(true);
+    setProcessedRows(0); // 每次點擊重置進度
 
     const ext = file.name.split(".").pop()?.toLowerCase();
     let rows: any[] = [];
 
+    // ... (保持您原本的 CSV / XLSX 檔案讀取組裝邏輯不變) ...
     if (ext === "csv") {
       const text = await file.text();
       const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-      // 將 header key 全部轉小寫，避免 Age vs age 問題
       rows = (parsed.data as any[]).map((row) => {
         const normalized: Record<string, any> = {};
-        Object.keys(row).forEach((key) => {
-          normalized[key.toLowerCase()] = row[key];
-        });
+        Object.keys(row).forEach((key) => { normalized[key.toLowerCase()] = row[key]; });
         return normalized;
-      });
-      // ========================================================
-      // 🟢【新增】對 CSV 讀取出的 rows 進行資料清洗，確保 id 為純整數
-      // ========================================================
-      rows = rows.map((row) => {
-        if (row.id !== null && row.id !== undefined && row.id !== "") {
-          row.id = Math.floor(Number(row.id));
-        }
+      }).map((row) => {
+        if (row.id !== null && row.id !== undefined && row.id !== "") { row.id = Math.floor(Number(row.id)); }
         return row;
       });
     } else if (ext === "xlsx" || ext === "xls") {
@@ -111,37 +77,17 @@ export default function ImportBar() {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
       const worksheet = workbook.worksheets[0];
-
       const headerRow = worksheet.getRow(1);
       const colMap: Record<string, number> = {};
-      headerRow.eachCell((cell, colNumber) => {
-        const val = cell.value ? String(cell.value).toLowerCase().trim() : "";
-        colMap[val] = colNumber;
-      });
-
+      headerRow.eachCell((cell, colNumber) => { const val = cell.value ? String(cell.value).toLowerCase().trim() : ""; colMap[val] = colNumber; });
       for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
         const row = worksheet.getRow(rowNumber);
         if (!row || row.cellCount === 0) continue;
         const idValue = row.getCell(colMap["id"]).value;
         if (idValue === null || idValue === undefined) continue;
-
-        // ========================================================
-        // 🟢【新增】修改後的 fixed 組裝方式（強制將 id 轉為無小數點的純整數）
-        // ========================================================
-        const fixed = {
-          id: Math.floor(Number(idValue)), // 👈 破除 1.0 變浮點數的關鍵
-          name: String(row.getCell(colMap["name"]).value || ""),
-          email: String(row.getCell(colMap["email"]).value || ""),
-          role: String(row.getCell(colMap["role"]).value || ""),
-        };
-
+        const fixed = { id: Math.floor(Number(idValue)), name: String(row.getCell(colMap["name"]).value || ""), email: String(row.getCell(colMap["email"]).value || ""), role: String(row.getCell(colMap["role"]).value || "") };
         const metadata: Record<string, any> = {};
-        Object.keys(colMap).forEach((key) => {
-          if (!["id", "name", "email", "role"].includes(key)) {
-            metadata[key] = row.getCell(colMap[key]).value || null;
-          }
-        });
-
+        Object.keys(colMap).forEach((key) => { if (!["id", "name", "email", "role"].includes(key)) { metadata[key] = row.getCell(colMap[key]).value || null; } });
         rows.push({ ...fixed, metadata });
       }
     } else {
@@ -153,27 +99,35 @@ export default function ImportBar() {
     setTotalRows(rows.length);
 
     const totalBatches = Math.ceil(rows.length / batchSize);
-    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += parallelLimit) {
-      const batchPromises: Promise<void>[] = [];
-      for (let j = 0; j < parallelLimit && batchIndex + j < totalBatches; j++) {
-        const currentBatch = batchIndex + j;
-        const start = currentBatch * batchSize;
-        const end = Math.min(start + batchSize, rows.length);
-        const customers = rows.slice(start, end);
-        const infos = customers.map((c) => ({ id: c.id, email: c.email }));
-        batchPromises.push(sendBatch(currentBatch, customers, infos));
-      }
-      await Promise.all(batchPromises);
-    }
-
-    setIsProcessing(false);
-
-    // 3. 關鍵：上傳完成後，通知 Next.js 重新抓取資料
-    // 這會觸發伺服器重新執行 DashboardPage 的 prisma 查詢
-    router.refresh(); 
     
-    // 選項：如果想給使用者更明確的提示
-    alert("資料上傳並同步完成！");
+    try {
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += parallelLimit) {
+        const batchPromises: Promise<void>[] = [];
+        for (let j = 0; j < parallelLimit && batchIndex + j < totalBatches; j++) {
+          const currentBatch = batchIndex + j;
+          const start = currentBatch * batchSize;
+          const end = Math.min(start + batchSize, rows.length);
+          const customers = rows.slice(start, end);
+          const infos = customers.map((c) => ({ id: c.id, email: c.email }));
+          batchPromises.push(sendBatch(currentBatch, customers, infos));
+        }
+        // 當任何一個 Batch 丟出 Error，Promise.all 會立刻中斷
+        await Promise.all(batchPromises);
+      }
+
+      // 全部順利完成
+      setIsProcessing(false);
+      router.refresh(); 
+      alert("資料上傳並同步完成！");
+
+    } catch (err: any) {
+      // 🎯 這裡會穩穩地接到後端傳出來的原始換行錯誤訊息！
+      console.error("上傳過程遭到攔截:", err);
+      setIsProcessing(false);
+      
+      // 直接跳出最純粹、帶有換行符號的客製化詳細報告
+      alert(err.message || "上傳中止。");
+    }
   };
 
   return (
