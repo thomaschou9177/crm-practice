@@ -38,40 +38,44 @@ export default function ImportBar() {
         },
       });
 
-      // 🟢【核心修復】：精準解析後端拋出的重複 Email 客製化訊息
+      // 🟢 進入 Supabase 傳回的錯誤判定
       if (error) {
         console.error("Batch upload failed (Supabase Error):", error);
         
-        // 嘗試讀取後端丟回來的客製化 Error Message
         let friendlyMessage = "批次上傳失敗，請檢查資料格式。";
-        
-        if (error.message) {
+
+        // 🔥 關鍵核心：挖掘被藏在 non-2xx 裡面的真實 Response
+        if (error.context && typeof error.context.response?.json === 'function') {
           try {
-            // 有時候錯誤會被包在 JSON 字串裡，嘗試解析它
-            const parsedError = JSON.parse(error.message);
-            friendlyMessage = parsedError.error || error.message;
-          } catch {
-            // 如果不是 JSON，代表它就是我們後端寫的那段純文字 Error 報告
-            friendlyMessage = error.message;
+            const bodyData = await error.context.response.json();
+            if (bodyData && bodyData.error) {
+              friendlyMessage = bodyData.error;
+            }
+          } catch (e) {
+            console.error("解析深層錯誤 JSON 失敗:", e);
           }
+        } else if (error.message && !error.message.includes("non-2xx")) {
+          friendlyMessage = error.message;
         }
 
-        // 🎯 直接在前端彈窗跳出最詳細的重複報告！
+        // 🎯 彈出最完美的客製化詳細重複報告！
         alert(`❌ 上傳中斷通知\n\n${friendlyMessage}`);
         
-        throw error; // 強制中斷後續的批次
+        throw error; // 中斷其餘批次
       } else {
         setProcessedRows((prev) => prev + customers.length);
       }
     } catch (err: any) {
-      console.error("Catch block caught error:", err);
+      console.error("Catch 區塊捕獲錯誤:", err);
       
-      // 防呆：如果是因為上面 throw error 跑到這裡，且已經 alert 過了，就不重複彈窗
-      // 如果是其他網路斷線等未知錯誤，也在這裡彈窗顯示
-      if (err && !err.message?.includes("Email 與資料庫重複")) {
+      // 這裡做第二層保險防線：如果在上面 throw error 跑到這，且訊息包含重複提示，就不再重複 alert 彈窗
+      // 如果是用戶完全斷網、或者其他程式語法崩潰，就在此處把原汁原味的訊息顯示出來
+      const isDuplicateAlerted = err?.context || err?.message?.includes("Email 與資料庫重複");
+      
+      if (!isDuplicateAlerted) {
         alert(`❌ 系統回報錯誤: ${err.message || "未知錯誤"}`);
       }
-      throw err; // 確保 Promise.all 收到異常並立刻停止其他執行緒
+      throw err; 
     }
   };
 
