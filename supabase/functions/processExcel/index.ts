@@ -38,6 +38,35 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { db: { schema: targetSchema } } // 關鍵：動態切換 Schema 
     );
+    // ====================================================================
+    // 🔍 🛠️ 【核心新增】Email 重複資料預檢阻斷機制
+    // ====================================================================
+    // 1. 收集前端本次批次傳入的所有 Email 
+    const batchEmails = customers.map((c: any) => c.email).filter(Boolean);
+
+    // 2. 去資料庫查詢這些 Email 是否已經存在
+    const { data: duplicateRecords, error: checkError } = await supabase
+      .from("customer")
+      .select("id, email")
+      .in("email", batchEmails);
+
+    if (checkError) throw checkError;
+
+    // 3. 如果資料庫裡真的有重複的 Email，立即攔截、整理報告並中止上傳！
+    if (duplicateRecords && duplicateRecords.length > 0) {
+      // 整理出所有重複 Email 資料的 ID 列表
+      const duplicateIds = duplicateRecords.map((r) => r.id).sort((a, b) => a - b);
+      const totalDuplicates = duplicateRecords.length;
+
+      // 拋出客製化的格式化錯誤訊息，以便前端讀取顯示
+      throw new Error(
+        `偵測到 Email 與資料庫重複！\n` +
+        `重疊資料總數：${totalDuplicates} 筆\n` +
+        `資料庫中已佔用此 Email 的客戶 ID 列表：[ ${duplicateIds.join(", ")} ]\n` +
+        `為保護資料結構，已強制中止本次上傳動作。`
+      );
+    }
+    
     // 🟢【新增自動化步驟】如果是追加模式，先用 Service Role 查出目前資料庫的最大 ID
     let currentMaxId = 0;
     if (appendIfDuplicate === true) {
