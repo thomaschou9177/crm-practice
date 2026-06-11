@@ -73,10 +73,12 @@ Deno.serve(async (req) => {
     let customerError = null;
     if (appendIfDuplicate === true) {
       // 【情境 A：使用者勾選追加】
-      // 走舊有 upsert 邏輯，主要檢驗 email
+      // 🚨 修正：當勾選追加時，如果 email 發生重複，舊的寫法只會回傳舊資料的 email
+      // 卻「不會」回傳舊資料的 ID，導致下方的 customer_info 拿不到 ID 寫入失敗！
+      // 改用 .upsert(..., { onConflict: 'email', ignoreDuplicates: false }) 確保回傳所有實體 ID
       const res = await supabase
         .from("customer")
-        .upsert(customerPayload, { onConflict: 'email' })
+        .upsert(customerPayload, { onConflict: 'email', ignoreDuplicates: false })
         .select("id, email");
       insertedCustomers = res.data;
       customerError = res.error;
@@ -95,17 +97,23 @@ Deno.serve(async (req) => {
 
     // 2. 利用剛剛成功寫入後，資料庫分配/找到的正確主鍵 id，建立 info 關聯
     if (insertedCustomers && insertedCustomers.length > 0) {
-      const infoPayload = insertedCustomers.map((inserted) => ({
-        id: inserted.id, // 精準對齊的外鍵 id
-        email: inserted.email
-      }));
+      // 🚨 修正：過濾掉 id 為 null 的無效資料，確保 Payload 絕對安全
+      const infoPayload = insertedCustomers
+                          .filter((inserted) => inserted.id !== null && inserted.id !== undefined)
+                          .map((inserted) => ({
+                               id: inserted.id, // 精準對齊的外鍵 id
+                               email: inserted.email
+                          }));
 
       // 3. 寫入 customer_info，以 id (主鍵) 作為重複判定
-      const { error: infoError } = await supabase
-        .from("customer_info")
-        .upsert(infoPayload, { onConflict: 'id' });
-        
-      if (infoError) throw infoError;
+      // 只有當真的有有效的 infoPayload 時才執行寫入，避免空的 Array 呼叫語法錯誤
+      if (infoPayload.length > 0) {
+        const { error: infoError } = await supabase
+          .from("customer_info")
+          .upsert(infoPayload, { onConflict: 'id' });
+          
+        if (infoError) throw infoError;
+      }
     }
 
     return new Response(
@@ -117,10 +125,11 @@ Deno.serve(async (req) => {
     );
 
   } catch (error: any) {
+    // 🚨 修正：不要用 500，維持 400，這樣前端的 PostgREST Client 才會正確認定它是個可攔截的請求錯誤
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || String(error) }),
       { 
-        status: 500, 
+        status: 400, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
