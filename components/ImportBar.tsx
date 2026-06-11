@@ -29,24 +29,49 @@ export default function ImportBar() {
   const sendBatch = async (batchIndex: number, customers: any[], infos: any[]) => {
     try {
       const { data, error } = await supabase.functions.invoke("processExcel", {
-        body: { batchIndex, 
-                customers, 
-                infos,
-                tenant: tenant || 'public',
-                appendIfDuplicate // 🟢 關鍵：將使用者的抉擇傳遞給後端 Edge Function
-              },
+        body: { 
+          batchIndex, 
+          customers, 
+          infos,
+          tenant: tenant || 'public',
+          appendIfDuplicate 
+        },
       });
 
+      // 🟢【核心修復】：精準解析後端拋出的重複 Email 客製化訊息
       if (error) {
-        console.error("Batch upload failed:", error);
-        alert("Batch upload failed, check console logs.");
-        throw error; // 這裡 throw 會中斷後續的 Promise.all，達到「取消這次動作」的效果
+        console.error("Batch upload failed (Supabase Error):", error);
+        
+        // 嘗試讀取後端丟回來的客製化 Error Message
+        let friendlyMessage = "批次上傳失敗，請檢查資料格式。";
+        
+        if (error.message) {
+          try {
+            // 有時候錯誤會被包在 JSON 字串裡，嘗試解析它
+            const parsedError = JSON.parse(error.message);
+            friendlyMessage = parsedError.error || error.message;
+          } catch {
+            // 如果不是 JSON，代表它就是我們後端寫的那段純文字 Error 報告
+            friendlyMessage = error.message;
+          }
+        }
+
+        // 🎯 直接在前端彈窗跳出最詳細的重複報告！
+        alert(`❌ 上傳中斷通知\n\n${friendlyMessage}`);
+        
+        throw error; // 強制中斷後續的批次
       } else {
         setProcessedRows((prev) => prev + customers.length);
       }
-    } catch (err) {
-      console.error("Batch upload failed:", err);
-      alert("Batch upload failed, check console logs.");
+    } catch (err: any) {
+      console.error("Catch block caught error:", err);
+      
+      // 防呆：如果是因為上面 throw error 跑到這裡，且已經 alert 過了，就不重複彈窗
+      // 如果是其他網路斷線等未知錯誤，也在這裡彈窗顯示
+      if (err && !err.message?.includes("Email 與資料庫重複")) {
+        alert(`❌ 系統回報錯誤: ${err.message || "未知錯誤"}`);
+      }
+      throw err; // 確保 Promise.all 收到異常並立刻停止其他執行緒
     }
   };
 
