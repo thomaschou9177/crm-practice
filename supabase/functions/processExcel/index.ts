@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
         // 【情況 A：使用者勾選追加】
         // 🟢 密技：不再交給 Sequence，我們自己在程式碼中發號牌，保證連續不跳號！
         incrementalId++;
-        return { name: c.name, email: c.email, role: c.role, metadata };
+        return { id: incrementalId,name: c.name, email: c.email, role: c.role, metadata };
       } else {
         // 【情況 B：使用者未勾選追加（預設，欲取消動作）】
         // 我們誠實把 Excel 的 id 傳過去。
