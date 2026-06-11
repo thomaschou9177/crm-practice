@@ -38,8 +38,23 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { db: { schema: targetSchema } } // 關鍵：動態切換 Schema 
     );
+    // 🟢【新增自動化步驟】如果是追加模式，先用 Service Role 查出目前資料庫的最大 ID
+    let currentMaxId = 0;
+    if (appendIfDuplicate === true) {
+      const { data: maxData } = await supabase
+        .from("customer")
+        .select("id")
+        .order("id", { ascending: false })
+        .limit(1);
+      
+      if (maxData && maxData.length > 0) {
+        currentMaxId = maxData[0].id;
+      }
+    }
     // 處理資料邏輯...
     const fixedKeys = ["id", "name", "email", "role"];
+    // 🟢 修改 map 邏輯
+    let incrementalId = currentMaxId; // 計數器指針
     const customerPayload = customers.map((c: any) => {
       const metadata: Record<string, any> = {};
       Object.keys(c).forEach((key) => {
@@ -54,8 +69,8 @@ Deno.serve(async (req) => {
       // 🟢 行為分支邏輯
       if (appendIfDuplicate === true) {
         // 【情況 A：使用者勾選追加】
-        // 我們完全不傳入任何 id 屬性！
-        // 這樣資料庫會直接觸發 SERIAL 的 nextval()，自動追加到全資料庫最新、最後面的序列 ID
+        // 🟢 密技：不再交給 Sequence，我們自己在程式碼中發號牌，保證連續不跳號！
+        incrementalId++;
         return { name: c.name, email: c.email, role: c.role, metadata };
       } else {
         // 【情況 B：使用者未勾選追加（預設，欲取消動作）】
