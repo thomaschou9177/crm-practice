@@ -39,9 +39,26 @@ export default function ImportBar() {
     });
 
     // 1. 先捕捉 Supabase 套件本身的網路或端點異常
+    // 🟢【全面修正】：即便 error 存在 (status 400)，也要把裡面的真實業務邏輯錯誤挖出來！
     if (error) {
       console.error("Supabase invoke error:", error);
-      throw new Error("與後端連線異常，請稍後再試。");
+      
+      let serverErrorMessage = "";
+      
+      // 嘗試穿透 SDK 殼子，讀取後端 return 的 JSON 內容
+      if (error.context && typeof error.context.response?.json === 'function') {
+        try {
+          const bodyData = await error.context.response.json();
+          if (bodyData && bodyData.error) {
+            serverErrorMessage = bodyData.error; // 這裡拿到的就是「偵測到 Email 與資料庫重複...」
+          }
+        } catch (e) {
+          console.error("解析深層錯誤 JSON 失敗:", e);
+        }
+      }
+
+      // 如果挖出來有自訂錯誤，就拋出這個自訂錯誤；否則才用預設的連線異常
+      throw new Error(serverErrorMessage || error.message || "與後端連線異常，請稍後再試。");
     }
 
     // 2. 🔥 精準攔截後端回傳的 success: false 業務邏輯報告
