@@ -40,24 +40,30 @@ export default function ImportBar() {
 
     // 1. 先捕捉 Supabase 套件本身的網路或端點異常
     // 🟢【全面修正】：即便 error 存在 (status 400)，也要把裡面的真實業務邏輯錯誤挖出來！
+    // 🟢【真·終極修復】：安全穿透 non-2xx 屏障，防範 Stream 鎖定
     if (error) {
-      console.error("Supabase invoke error:", error);
+      console.error("Supabase invoke error 原型:", error);
       
       let serverErrorMessage = "";
       
-      // 嘗試穿透 SDK 殼子，讀取後端 return 的 JSON 內容
-      if (error.context && typeof error.context.response?.json === 'function') {
+      if (error.context && error.context.response) {
         try {
-          const bodyData = await error.context.response.json();
-          if (bodyData && bodyData.error) {
-            serverErrorMessage = bodyData.error; // 這裡拿到的就是「偵測到 Email 與資料庫重複...」
+          // 使用 clone() 或是直接讀取 text()，避免 Body 已經被讀取過的衝突
+          const responseText = await error.context.response.text();
+          console.log("後端回傳的原始錯誤字串:", responseText);
+          
+          if (responseText) {
+            const bodyData = JSON.parse(responseText);
+            if (bodyData && bodyData.error) {
+              serverErrorMessage = bodyData.error; // 順利拿到「偵測到 Email 與資料庫重複...」
+            }
           }
         } catch (e) {
-          console.error("解析深層錯誤 JSON 失敗:", e);
+          console.error("嘗試穿透解析後端錯誤內文失敗 (Stream 已被消費):", e);
         }
       }
-
-      // 如果挖出來有自訂錯誤，就拋出這個自訂錯誤；否則才用預設的連線異常
+      
+      // 🎯 如果成功挖出後端的貼心提示，就拋出它；否則拋出 SDK 預設訊息
       throw new Error(serverErrorMessage || error.message || "與後端連線異常，請稍後再試。");
     }
 
