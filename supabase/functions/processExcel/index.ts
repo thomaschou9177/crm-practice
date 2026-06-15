@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     
     
     // 1. 從請求 Body 中取得 tenant 資訊
-    const { batchIndex, customers, infos,tenant,appendIfDuplicate } = await req.json();
+    const { batchIndex, customers, infos,tenant,appendIfDuplicate,onlyCheck } = await req.json();
     // 2. 決定要使用的 Schema：如果有傳入 tenant 就用它，否則預設為 'public'
     const targetSchema = tenant || 'public';
     // 3. 根據目標 Schema 初始化 Client
@@ -70,6 +70,13 @@ Deno.serve(async (req) => {
           success: false,
           error: `偵測到 Email 與資料庫重複！\n重疊資料總數：${totalDuplicates} 筆\n資料庫中已佔用此 Email 的客戶 ID 列表：[ ${duplicateIds.join(", ")} ]\n為保護資料結構，已強制中止本次上傳動作。`
         }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    // 🟢【核心控制】：如果是純檢查模式，到這裡沒重複就可以安全退出了，絕不寫入資料庫
+    if (onlyCheck === true) {
+      return new Response(
+        JSON.stringify({ success: true, message: "預檢通過，無重複資料" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

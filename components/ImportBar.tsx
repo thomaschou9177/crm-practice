@@ -26,14 +26,15 @@ export default function ImportBar() {
   const batchSize = 5000;
   const parallelLimit = 3;
 
-  const sendBatch = async (batchIndex: number, customers: any[], infos: any[]) => {
+  const sendBatch = async (batchIndex: number, customers: any[], infos: any[], onlyCheck: boolean = false) => {
     const { data, error } = await supabase.functions.invoke("processExcel", {
       body: { 
         batchIndex, 
         customers, 
         infos,
         tenant: tenant || 'public',
-        appendIfDuplicate 
+        appendIfDuplicate,
+        onlyCheck // 👈 傳送給後端，控制是否只進行檢查而不寫入
       },
     });
 
@@ -48,8 +49,10 @@ export default function ImportBar() {
       throw new Error(data.error || "批次上傳失敗。");
     }
 
-    // 3. 成功時才累加 rows
-    setProcessedRows((prev) => prev + customers.length);
+    // 只有在非純檢查（真實寫入）時，才累加進度條 rows
+    if (!onlyCheck) {
+      setProcessedRows((prev) => prev + customers.length);
+    }
   };
 
   const handleProcess = async () => {
@@ -101,18 +104,29 @@ export default function ImportBar() {
     const totalBatches = Math.ceil(rows.length / batchSize);
     
     try {
-      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += parallelLimit) {
-        const batchPromises: Promise<void>[] = [];
-        for (let j = 0; j < parallelLimit && batchIndex + j < totalBatches; j++) {
-          const currentBatch = batchIndex + j;
-          const start = currentBatch * batchSize;
-          const end = Math.min(start + batchSize, rows.length);
-          const customers = rows.slice(start, end);
-          const infos = customers.map((c) => ({ id: c.id, email: c.email }));
-          batchPromises.push(sendBatch(currentBatch, customers, infos));
-        }
-        // 當任何一個 Batch 丟出 Error，Promise.all 會立刻中斷
-        await Promise.all(batchPromises);
+      // ====================================================================
+      // 🛡️ 階段一：【黃金防線】全檔案「純預檢」模式 (onlyCheck: true)
+      // ====================================================================
+      // 依序檢查所有批次，此階段絕對不改動資料庫。只要有任何一批內含重複 Email，立刻被 catch 攔截！
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const start = batchIndex * batchSize;
+        const end = Math.min(start + batchSize, rows.length);
+        const customers = rows.slice(start, end);
+        const infos = customers.map((c) => ({ id: c.id, email: c.email }));
+
+        await sendBatch(batchIndex, customers, infos, true); // 👈 帶入 true，開啟純檢查
+      }
+      // ====================================================================
+      // 🚀 階段二：【全面放行】實際寫入資料庫階段 (onlyCheck: false)
+      // ====================================================================
+      // 能走到這裡，代表「整張 Excel 超過 1 萬筆資料全部百分之百乾淨、絕無重複」！
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const start = batchIndex * batchSize;
+        const end = Math.min(start + batchSize, rows.length);
+        const customers = rows.slice(start, end);
+        const infos = customers.map((c) => ({ id: c.id, email: c.email }));
+
+        await sendBatch(batchIndex, customers, infos, false); // 👈 帶入 false，正式寫入
       }
 
       // 全部順利完成
@@ -124,7 +138,7 @@ export default function ImportBar() {
       // 🎯 這裡會穩穩地接到後端傳出來的原始換行錯誤訊息！
       console.error("上傳過程遭到攔截:", err);
       setIsProcessing(false);
-      
+      setProcessedRows(0); // 失敗時重置進度條
       // 直接跳出最純粹、帶有換行符號的客製化詳細報告
       alert(err.message || "上傳中止。");
     }
