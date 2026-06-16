@@ -48,14 +48,16 @@ export default function ImportBar() {
       
       if (error.context && error.context.response) {
         try {
-          // 使用 clone() 或是直接讀取 text()，避免 Body 已經被讀取過的衝突
-          const responseText = await error.context.response.text();
-          console.log("後端回傳的原始錯誤字串:", responseText);
+          // 使用最安全的 response.clone().text()，徹底防止流鎖定與 undefined 崩潰
+          if (typeof error.context.response.clone === 'function') {
+            const resClone = error.context.response.clone();
+            const responseText = await resClone.text();
           
-          if (responseText) {
-            const bodyData = JSON.parse(responseText);
-            if (bodyData && bodyData.error) {
-              serverErrorMessage = bodyData.error; // 順利拿到「偵測到 Email 與資料庫重複...」
+            if (responseText) {
+              const bodyData = JSON.parse(responseText);
+              if (bodyData && bodyData.error) {
+                serverErrorMessage = bodyData.error; // 順利拿到「偵測到 Email 與資料庫重複...」
+              }
             }
           }
         } catch (e) {
