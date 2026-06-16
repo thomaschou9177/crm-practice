@@ -42,31 +42,8 @@ export default function ImportBar() {
     // 🟢【全面修正】：即便 error 存在 (status 400)，也要把裡面的真實業務邏輯錯誤挖出來！
     // 🟢【真·終極修復】：安全穿透 non-2xx 屏障，防範 Stream 鎖定
     if (error) {
-      console.error("Supabase invoke error 原型:", error);
-      
-      let serverErrorMessage = "";
-      
-      if (error.context && error.context.response) {
-        try {
-          // 使用最安全的 response.clone().text()，徹底防止流鎖定與 undefined 崩潰
-          if (typeof error.context.response.clone === 'function') {
-            const resClone = error.context.response.clone();
-            const responseText = await resClone.text();
-          
-            if (responseText) {
-              const bodyData = JSON.parse(responseText);
-              if (bodyData && bodyData.error) {
-                serverErrorMessage = bodyData.error; // 順利拿到「偵測到 Email 與資料庫重複...」
-              }
-            }
-          }
-        } catch (e) {
-          console.error("嘗試穿透解析後端錯誤內文失敗 (Stream 已被消費):", e);
-        }
-      }
-      
-      // 🎯 如果成功挖出後端的貼心提示，就拋出它；否則拋出 SDK 預設訊息
-      throw new Error(serverErrorMessage || error.message || "與後端連線異常，請稍後再試。");
+      console.error("網路或伺服器連線異常:", error);
+      throw new Error(error.message || "與後端連線異常，請稍後再試。");
     }
 
     // 2. 🔥 精準攔截後端回傳的 success: false 業務邏輯報告
