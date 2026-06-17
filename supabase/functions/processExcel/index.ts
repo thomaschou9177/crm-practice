@@ -159,12 +159,18 @@ Deno.serve(async (req) => {
     // 2. 利用剛剛成功寫入後，資料庫分配/找到的正確主鍵 id，建立 info 關聯
     if (insertedCustomers && insertedCustomers.length > 0) {
       // 🚨 修正：過濾掉 id 為 null 的無效資料，確保 Payload 絕對安全
-      const infoPayload = insertedCustomers
-                          .filter((inserted) => inserted.id !== null && inserted.id !== undefined)
-                          .map((inserted) => ({
-                               id: inserted.id, // 精準對齊的外鍵 id
-                               email: inserted.email
-                          }));
+      const infoPayload = (insertedCustomers || [])
+                    .filter((inserted) => {
+                      if (!inserted || inserted.id === null || inserted.id === undefined) return false;
+                      // 🛡️ 阻絕 Deno 轉換出來的文字 "NaN" 或真正數值的 NaN
+                      const strId = String(inserted.id).toLowerCase().trim();
+                      if (strId === "nan" || strId === "none" || Number.isNaN(Number(inserted.id))) return false;
+                      return true;
+                    })
+                    .map((inserted) => ({
+                         id: Math.floor(Number(inserted.id)), // 🟢 強制轉成絕對安全的整數
+                         email: inserted.email
+                    }));
 
       // 3. 寫入 customer_info，以 id (主鍵) 作為重複判定
       // 只有當真的有有效的 infoPayload 時才執行寫入，避免空的 Array 呼叫語法錯誤
