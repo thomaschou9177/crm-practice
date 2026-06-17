@@ -69,14 +69,45 @@ export default function ImportBar() {
     if (ext === "csv") {
       const text = await file.text();
       const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-      rows = (parsed.data as any[]).map((row) => {
+      const rawRows = (parsed.data as any[]).map((row) => {
         const normalized: Record<string, any> = {};
         Object.keys(row).forEach((key) => { normalized[key.toLowerCase()] = row[key]; });
         return normalized;
-      }).map((row) => {
-        if (row.id !== null && row.id !== undefined && row.id !== "") { row.id = Math.floor(Number(row.id)); }
-        return row;
       });
+
+      // 🔥【核心修正】徹底清洗 CSV 資料，不讓任何一個 NaN 或無效 ID 進到 rows 陣列中
+      for (const row of rawRows) {
+        const parsedId = Number(row.id);
+        
+        // 根本防禦：如果 id 為空、轉出來是 NaN、或是文字字串 "nan"/"none"，直接跳過這行（視為無效行）
+        if (
+          row.id === null || 
+          row.id === undefined || 
+          String(row.id).trim() === "" || 
+          String(row.id).toLowerCase() === "nan" || 
+          String(row.id).toLowerCase() === "none" || 
+          Number.isNaN(parsedId)
+        ) {
+          continue; 
+        }
+
+        // 只有 100% 合法的資料才能被 push 進 rows
+        const fixed = { 
+          id: Math.floor(parsedId), 
+          name: row.name ? String(row.name).trim() : "", 
+          email: row.email ? String(row.email).trim() : "", 
+          role: row.role ? String(row.role).trim() : "" 
+        };
+        
+        const metadata: Record<string, any> = {};
+        Object.keys(row).forEach((key) => { 
+          if (!["id", "name", "email", "role"].includes(key)) { 
+            metadata[key] = row[key] === "" ? null : row[key]; 
+          } 
+        });
+        
+        rows.push({ ...fixed, metadata });
+      }
     } else if (ext === "xlsx" || ext === "xls") {
       const arrayBuffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
@@ -89,8 +120,16 @@ export default function ImportBar() {
         const row = worksheet.getRow(rowNumber);
         if (!row || row.cellCount === 0) continue;
         const idValue = row.getCell(colMap["id"]).value;
-        // 根本防禦：如果拿到的值轉成數字後是 NaN，或者根本是空的，直接跳過這行（視為無效行）
-        if (idValue === null || idValue === undefined || Number.isNaN(Number(idValue)) || String(idValue).trim() === "") {
+        const parsedId = Number(idValue);
+        // 🔥【同步修正】XLSX 的極致型別檢查，排除所有可能逼出 NaN 的空值或 "NaN" 字串
+        if (
+          idValue === null || 
+          idValue === undefined || 
+          String(idValue).trim() === "" || 
+          String(idValue).toLowerCase() === "nan" || 
+          String(idValue).toLowerCase() === "none" || 
+          Number.isNaN(parsedId)
+        ) {
           continue; 
         }
         const fixed = { id: Math.floor(Number(idValue)), name: String(row.getCell(colMap["name"]).value || ""), email: String(row.getCell(colMap["email"]).value || ""), role: String(row.getCell(colMap["role"]).value || "") };
