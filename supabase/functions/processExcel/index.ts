@@ -44,8 +44,8 @@ Deno.serve(async (req) => {
     const batchEmails = customers.map((c: any) => c.email).filter(Boolean);
     const duplicateRecords: any[] = [];
     
-    // 💡 設定每一小批次只查 300 個 Email，防止 URL 長度爆掉
-    const chunkSize = 300; 
+    // 💡 設定每一小批次只查 400 個 Email，防止 URL 長度爆掉
+    const chunkSize = 400; 
     for (let i = 0; i < batchEmails.length; i += chunkSize) {
       const chunk = batchEmails.slice(i, i + chunkSize);
       
