@@ -144,7 +144,11 @@ export default function ImportBar() {
     }
 
     setTotalRows(rows.length);
-
+    if (rows.length === 0) {
+      alert("❌ 偵測不到檔案內任何有效的資料列（或全部皆為空白髒資料），已中止動作。");
+      setIsProcessing(false);
+      return;
+    }
     const totalBatches = Math.ceil(rows.length / batchSize);
     
     try {
