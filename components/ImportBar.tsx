@@ -89,7 +89,10 @@ export default function ImportBar() {
         const row = worksheet.getRow(rowNumber);
         if (!row || row.cellCount === 0) continue;
         const idValue = row.getCell(colMap["id"]).value;
-        if (idValue === null || idValue === undefined) continue;
+        // 根本防禦：如果拿到的值轉成數字後是 NaN，或者根本是空的，直接跳過這行（視為無效行）
+        if (idValue === null || idValue === undefined || Number.isNaN(Number(idValue)) || String(idValue).trim() === "") {
+          continue; 
+        }
         const fixed = { id: Math.floor(Number(idValue)), name: String(row.getCell(colMap["name"]).value || ""), email: String(row.getCell(colMap["email"]).value || ""), role: String(row.getCell(colMap["role"]).value || "") };
         const metadata: Record<string, any> = {};
         Object.keys(colMap).forEach((key) => { if (!["id", "name", "email", "role"].includes(key)) { metadata[key] = row.getCell(colMap[key]).value || null; } });
