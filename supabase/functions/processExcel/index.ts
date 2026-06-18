@@ -42,27 +42,29 @@ Deno.serve(async (req) => {
     // 🔍 預檢機制：【已修復 URL 過長問題】分段排查 Email 是否重複
     // ====================================================================
     const batchEmails = customers.map((c: any) => c.email).filter(Boolean);
-    const duplicateRecords: any[] = [];
+    let duplicateRecords: any[] = [];
     
-    // 💡 設定每一小批次只查 400 個 Email，防止 URL 長度爆掉
-    const chunkSize = 400; 
-    for (let i = 0; i < batchEmails.length; i += chunkSize) {
-      const chunk = batchEmails.slice(i, i + chunkSize);
-      
-      const { data: chunkDuplicates, error: checkError } = await supabase
-        .from("customer")
-        .select("id, email")
-        .in("email", chunk);
+    // 🟢 【強固性優化開始】：檢查這批次是否有有效的 Email，避免將空陣列丟給 RPC 觸發型態推導異常
+    if (batchEmails.length === 0) {
+      console.log(`批次 ${batchIndex + 1}: 無任何有效 Email，自動跳過 RPC 檢查。`);
+    } else {
+      // 當陣列內有資料時，才執行 RPC 連線比對
+      const { data, error: checkError } = await supabase
+        .rpc("check_duplicate_emails", { email_list: batchEmails });
 
-      if (checkError) throw checkError;
-      if (chunkDuplicates) {
-        duplicateRecords.push(...chunkDuplicates);
+      if (checkError) {
+        console.error("RPC 檢查重複發生錯誤:", checkError);
+        throw checkError;
+      }
+      
+      if (data) {
+        duplicateRecords = data;
       }
     }
-
-    // 如果分段撈完後，發現有任何重複，直接回報並阻斷
+    // 🟢 【強固性優化結束】
+    // 如果在資料庫中找到了重複的 Email 記錄，立即回報並阻斷
     if (duplicateRecords.length > 0) {
-      const duplicateIds = duplicateRecords.map((r) => r.id).sort((a, b) => a - b);
+      const duplicateIds = duplicateRecords.map((r: any) => r.id).sort((a: number, b: number) => a - b);
       const totalDuplicates = duplicateRecords.length;
 
       return new Response(
@@ -70,7 +72,10 @@ Deno.serve(async (req) => {
           success: false,
           error: `偵測到 Email 與資料庫重複！\n重疊資料總數：${totalDuplicates} 筆\n資料庫中已佔用此 Email 的客戶 ID 列表：[ ${duplicateIds.join(", ")} ]\n為保護資料結構，已強制中止本次上傳動作。`
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { 
+          status: 200, // 維持 200 回傳自訂錯誤訊息，以便前端 Catch 彈出視窗
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
       );
     }
     // 🟢【核心控制】：如果是純檢查模式，到這裡沒重複就可以安全退出了，絕不寫入資料庫
