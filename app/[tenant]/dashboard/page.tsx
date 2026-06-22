@@ -577,7 +577,11 @@ for (const key of allDynamicKeys) {
           {filteredSyncRecords.map((s: any) => (
             <tr key={`filtered-sync-${s.id}`} className="bg-amber-50/20">
               <td className="px-4 py-2 font-mono text-amber-700 border-r border-amber-100">{s.id}</td>
-              <td className="px-4 py-2 italic text-gray-700">{s.email}</td>
+              <td className="px-4 py-2 italic text-gray-700">
+                {s.email && typeof s.email === 'object' 
+                  ? (s.email.email !== undefined ? String(s.email.email) : JSON.stringify(s.email))
+                  : String(s.email || '')}
+              </td>
             </tr>
           ))}
         </tbody>

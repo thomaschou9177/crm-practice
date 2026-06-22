@@ -552,12 +552,31 @@ for (const key of allDynamicKeys) {
     {filteredSyncRecords.length > 0 ? (
       <table className="min-w-full text-[9px]">
         <tbody className="divide-y divide-amber-100">
-          {filteredSyncRecords.map((s: any) => (
-            <tr key={`filtered-sync-${s.id}`} className="bg-amber-50/20">
-              <td className="px-4 py-2 font-mono text-amber-700 border-r border-amber-100">{s.id}</td>
-              <td className="px-4 py-2 italic text-gray-700">{s.email}</td>
-            </tr>
-          ))}
+          {filteredSyncRecords.map((s: any) => {
+            // 🛡️ 強固防禦：檢查 s.email 是不是被 Prisma 關聯成了一個物件
+            let safeEmailStr = "";
+            
+            if (s.email && typeof s.email === 'object') {
+              // 如果它是一顆關聯物件，那真正的 email 字串通常存在 s.email.email 裡面
+              if (s.email.email !== undefined) {
+                safeEmailStr = String(s.email.email);
+              } else {
+                // 萬一它被覆蓋成了一顆純 metadata 物件，則將其打平成字串，防止 React 崩潰
+                safeEmailStr = JSON.stringify(s.email);
+              }
+            } else {
+              // 正常情況下，它就是個普通的固定字串欄位
+              safeEmailStr = String(s.email || '');
+            }
+
+            return (
+              <tr key={`filtered-sync-${s.id}`} className="bg-amber-50/20">
+                <td className="px-4 py-2 font-mono text-amber-700 border-r border-amber-100">{s.id}</td>
+                {/* 🟢 改為渲染安全處理後的純文字字串 */}
+                <td className="px-4 py-2 italic text-gray-700">{safeEmailStr}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     ) : (
