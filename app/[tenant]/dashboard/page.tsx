@@ -346,17 +346,30 @@ for (const key of allDynamicKeys) {
                         />
                       </td>
                     ))}
-                    {allDynamicKeys.map(key => (
-                      <td key={key} className="px-4 py-3">
-                        <EditableInput
-                          id={c.id}
-                          metadataKey={key}
-                          defaultValue={c.metadata?.[key] || ''}
-                          tenant={tenant}
-                          className="w-full bg-transparent border-b border-transparent focus:border-amber-500 text-indigo-600"
-                        />
-                      </td>
-                    ))}
+                    {/* 動態欄位擴充區塊 */}
+              {allDynamicKeys.map(key => {
+                // 🟢 【安全優化處：1. 提取潛在的值】
+                let rawValue = c[key] !== undefined ? c[key] : (c.metadata?.[key] || '');
+
+                // 🟢 【安全優化處：2. 🛡️ 核心防禦】如果發現值竟然是個物件，將其打平成字串，防止 React Child 報錯
+                if (rawValue && typeof rawValue === 'object') {
+                  rawValue = rawValue[key] !== undefined ? String(rawValue[key]) : JSON.stringify(rawValue);
+                } else {
+                  rawValue = String(rawValue || '');
+                }
+
+                return (
+                  <td key={key} className="px-4 py-3">
+                    <EditableInput
+                      id={c.id}
+                      metadataKey={key}
+                      defaultValue={rawValue} // 🟢 這裡傳入已經轉換為絕對安全字串的 rawValue
+                      tenant={tenant}
+                      className="w-full bg-transparent border-b border-transparent focus:border-amber-500 text-indigo-600"
+                    />
+                  </td>
+                );
+              })}
                     <td className="p-2 border-r bg-blue-50/30">
                       <form action={addOrUpdateColumnWithTenant} className="flex flex-col gap-1">
                         <input type="hidden" name="id" value={c.id} />

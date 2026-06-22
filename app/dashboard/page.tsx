@@ -325,17 +325,30 @@ for (const key of allDynamicKeys) {
                          />
                       </td>
                     ))}
-                    {allDynamicKeys.map(key => (
-                      <td key={key} className="px-4 py-3">
-                        <EditableInput
-                          id={c.id}
-                          metadataKey={key}
-                          defaultValue={c.metadata?.[key] || ''}
-                          tenant="public"
-                          className="w-full bg-transparent border-b border-transparent focus:border-amber-500 text-indigo-600"
-                        />
-                      </td>
-                    ))}
+                    {/* 動態欄位擴充區塊 */}
+              {allDynamicKeys.map(key => {
+                // 🟢 【安全優化處：1. 提取潛在的值】
+                let rawValue = c[key] !== undefined ? c[key] : (c.metadata?.[key] || '');
+
+                // 🟢 【安全優化處：2. 🛡️ 核心防禦】如果發現值不幸是一個 JavaScript 物件，將其轉為字串防止崩潰
+                if (rawValue && typeof rawValue === 'object') {
+                  rawValue = rawValue[key] !== undefined ? String(rawValue[key]) : JSON.stringify(rawValue);
+                } else {
+                  rawValue = String(rawValue || '');
+                }
+
+                return (
+                  <td key={key} className="px-4 py-3">
+                    <EditableInput
+                      id={c.id}
+                      metadataKey={key}
+                      defaultValue={rawValue} // 🟢 這裡傳入經過安全過濾與轉型的 rawValue
+                      tenant="public"
+                      className="w-full bg-transparent border-b border-transparent focus:border-amber-500 text-indigo-600"
+                    />
+                  </td>
+                );
+              })}
                     <td className="p-2 border-r bg-blue-50/30">
                       <form action={addOrUpdateColumn} className="flex flex-col gap-1">
                         <input type="hidden" name="id" value={c.id} />
