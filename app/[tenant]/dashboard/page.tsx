@@ -476,7 +476,7 @@ for (const key of allDynamicKeys) {
         
         {/* ✅ 動態 metadata 值（最終安全修正版） */}
         {allDynamicKeys.map((key) => {
-          // 1. 先取得原始值
+          // 1. 先取得原始值 
           let rawValue = meta[key];
 
           // 🟢 【關鍵修改處】：防禦性型態清洗
