@@ -444,24 +444,41 @@ for (const key of allDynamicKeys) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {filteredCustomers.map((c: any) => {
-            const meta = (c.metadata as Record<string, any>) || {};
-            return(
-            <tr key={`filtered-cust-${c.id}`} className="hover:bg-indigo-50/50">
-              <td className="px-2 py-2 border-r text-center font-mono text-gray-400">{c.id}</td>
-              <td className="px-4 py-2 border-r font-medium">{c.name}</td>
-              <td className="px-4 py-2 border-r text-indigo-700">{c.email}</td>
-              <td className="px-4 py-2 text-gray-600">{c.role}</td>
-              {/* ✅ 動態 metadata 值 */}
-                {allDynamicKeys.map((key) => (
-                  <td key={key} className="px-4 py-2 border-r text-blue-700 font-medium">
-                    {meta[key] || ""}
-                  </td>
-                ))}
-            </tr>
-            )
-          })}
-        </tbody>
+  {filteredCustomers.map((c: any) => {
+    const meta = (c.metadata as Record<string, any>) || {};
+    return (
+      <tr key={`filtered-cust-${c.id}`} className="hover:bg-indigo-50/50">
+        <td className="px-2 py-2 border-r text-center font-mono text-gray-400">{c.id}</td>
+        <td className="px-4 py-2 border-r font-medium">{c.name}</td>
+        <td className="px-4 py-2 border-r text-indigo-700">{c.email}</td>
+        <td className="px-4 py-2 text-gray-600">{c.role}</td>
+        
+        {/* ✅ 動態 metadata 值（最終安全修正版） */}
+        {allDynamicKeys.map((key) => {
+          // 1. 先取得原始值
+          let rawValue = meta[key];
+
+          // 🟢 【關鍵修改處】：防禦性型態清洗
+          // 如果發現這個欄位的值不幸是一顆物件（例如內含 age, birthday 等複雜結構）
+          if (rawValue && typeof rawValue === 'object') {
+            // 先看它內部有沒有跟當前 key 同名的欄位（如物件本身是 {age: 25}，且當前 key 也是 age）
+            rawValue = rawValue[key] !== undefined ? String(rawValue[key]) : JSON.stringify(rawValue);
+          } else {
+            // 正常狀況下直接確保轉成純文字字串
+            rawValue = String(rawValue || "");
+          }
+
+          return (
+            <td key={key} className="px-4 py-2 border-r text-blue-700 font-medium">
+              {/* 🟢 這裡渲染出來的必定是 100% 安全的字串，React 絕不崩潰 */}
+              {rawValue}
+            </td>
+          );
+        })}
+      </tr>
+    );
+  })}
+</tbody>
       </table>
     ) : (
       <div className="p-10 text-center bg-white border-2 border-dashed border-indigo-200 text-gray-400">
