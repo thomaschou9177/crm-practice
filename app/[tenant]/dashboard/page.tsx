@@ -73,14 +73,14 @@ export default async function DashboardPage(props:{
   });
 
   // 動態 metadata keys
-   // ✅ 將 metadata key 統一轉成小寫
+   // ✅ 將 metadata key 統一轉成小寫，並 🛡️ 阻絕 Prisma 關係查詢物件 (customer_info) 混入
   const allDynamicKeys: string[] = Array.from(
     new Set(
       allCustomers.flatMap((c: any) =>
         Object.keys((c.metadata as Record<string, any>) || {}).map(k => k.toLowerCase())
       )
     )
-  );
+  ).filter((key) => key !== 'customer_info'); // 🟢 【新增修改處】：精準剔除 include 進來的關聯屬性名稱
 
   // 判斷是否有啟用過濾
   const isCustomerFiltering = Object.entries({ id, name, email, role, ...Object.fromEntries(allDynamicKeys.map((k:string) => [k, params[k] as string | undefined])),
