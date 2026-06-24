@@ -89,7 +89,8 @@ Deno.serve(async (req) => {
     // 🚀 安全過濾通過，開始整理資料 Payload
     // ====================================================================
     // 處理資料邏輯...
-    const fixedKeys = ["id", "name", "email", "role"];
+    // 🟢 1. 將 "metadata" 加入排除名單，防止迴圈錯誤打包
+    const fixedKeys = ["id", "name", "email", "role", "metadata"];
     // 🟢【新增自動化步驟】如果是追加模式，先用 Service Role 查出目前資料庫的最大 ID
     let currentMaxId = 0;
     if (appendIfDuplicate === true) {
@@ -107,7 +108,10 @@ Deno.serve(async (req) => {
     // 🟢 修改 map 邏輯
     let incrementalId = currentMaxId; // 計數器指針
     const customerPayload = customers.map((c: any) => {
-      const metadata: Record<string, any> = {};
+      // 🟢 2. 直接繼承並展開前端已經包好的 c.metadata 內容
+      const metadata: Record<string, any> = (c.metadata && typeof c.metadata === 'object') 
+        ? { ...c.metadata } 
+        : {};
       Object.keys(c).forEach((key) => {
         if (!fixedKeys.includes(key)) metadata[key] = c[key];
       });
