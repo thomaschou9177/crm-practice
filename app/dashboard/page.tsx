@@ -62,18 +62,33 @@ export default async function DashboardPage(props: {
     )
   ).filter((key) => key !== 'customer_info' && key !== 'metadata');
 
-  // 🟢 2. 【核心實作：先找出舊欄位有哪些】
-  // 我們直接去抓全體客戶（allCustomers）中第一筆客戶身上一開始就存在的舊欄位
-  const firstMeta = (allCustomers[0]?.metadata as Record<string, any>) || {};
-  const baseKeys = Object.keys(firstMeta)
-    .map(k => k.toLowerCase())
-    .filter((key) => key !== 'customer_info' && key !== 'metadata');
+  // 🟢 2. 【真正 100% 動態辨識新舊欄位】：
+  // 依據您的天才邏輯：「一開始沒加入 JsonB 的欄位，就是新欄位」。
+  // 我們直接去檢查前 5 筆客戶資料（這幾筆必然是歷史舊資料）。
+  // 只要某個欄位名稱在「前 5 筆客戶資料裡全部都不存在」，代表它就是後來才透過 Add Column 點出來的新欄位！
+  const newlyAddedKeys: string[] = [];
+  const baseKeys: string[] = [];
+
+  rawDynamicKeys.forEach((key) => {
+    // 檢查前 5 筆歷史客戶，是否有任何一個人身上有這個 key
+    const existsInOldData = allCustomers.slice(0, 5).some((c: any) => {
+      const meta = (c.metadata as Record<string, any>) || {};
+      const lowerKeys = Object.keys(meta).map(k => k.toLowerCase());
+      return lowerKeys.includes(key);
+    });
+
+    if (existsInOldData) {
+      baseKeys.push(key);       // 原本舊資料就有的，歸類為舊欄位
+    } else {
+      newlyAddedKeys.push(key); // 一開始沒加入任何舊資料 JsonB 的，歸類為新欄位（例如 like）
+    }
+  });
 
   // 🟢 3. 【最後完美對齊】：
-  // 先把原本就有的舊欄位擺在前面，接著動態過濾出那些不在舊欄位清單裡、後來才新誕生的欄位（如 hobby），直接用解構緊接著推到最後面！
+  // 先保留原本最原始的舊欄位順序（baseKeys），接著把新誕生、一開始沒加過的新欄位（newlyAddedKeys）百分之百緊接在後面！
   const allDynamicKeys: string[] = [
-    ...baseKeys, // 👈 舊欄位們（不管叫什麼名稱，如 age, birthday... 都不用硬編碼寫死）
-    ...rawDynamicKeys.filter(k => !baseKeys.includes(k)) // 👈 🎯 新增的欄位（如 hobby），百分之百直接塞到舊欄位緊接著的後面！
+    ...baseKeys,
+    ...newlyAddedKeys
   ];
 
   // 判斷是否有啟用過濾
