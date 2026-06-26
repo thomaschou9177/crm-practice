@@ -52,7 +52,7 @@ export default async function DashboardPage(props: {
     take: syncPageSize,
   });
 
-  // 🟢 1. 完全保留您原本的動態解析與過濾邏輯，先拿到一個基礎陣列
+  // 🟢 1. 完全保留您最讚的動態解析與過濾邏輯，先拿到包含了新舊所有屬性的基礎陣列
   const rawDynamicKeys: string[] = Array.from(
     new Set(
       allCustomers.flatMap((c: any) => {
@@ -62,19 +62,19 @@ export default async function DashboardPage(props: {
     )
   ).filter((key) => key !== 'customer_info' && key !== 'metadata');
 
-  // 🟢 2. 【最簡單的動態防錯位排序】：
-  // 我們檢查第一筆客戶身上一開始就存在的欄位。只要是全體資料中有、但第一筆資料中沒有的欄位，代表它是後來新誕生的！
-  const firstCustomerMeta = (allCustomers[0]?.metadata as Record<string, any>) || {};
-  const initialKeys = Object.keys(firstCustomerMeta).map(k => k.toLowerCase());
+  // 🟢 2. 【核心實作：先找出舊欄位有哪些】
+  // 我們直接去抓全體客戶（allCustomers）中第一筆客戶身上一開始就存在的舊欄位
+  const firstMeta = (allCustomers[0]?.metadata as Record<string, any>) || {};
+  const baseKeys = Object.keys(firstMeta)
+    .map(k => k.toLowerCase())
+    .filter((key) => key !== 'customer_info' && key !== 'metadata');
 
-  const allDynamicKeys = [...rawDynamicKeys].sort((a, b) => {
-    const hasA = initialKeys.includes(a);
-    const hasB = initialKeys.includes(b);
-
-    if (hasA && !hasB) return -1; // 舊欄位排前面
-    if (!hasA && hasB) return 1;  // 新欄位（如 hobby）往後推
-    return 0;                     // 其他維持原樣
-  });
+  // 🟢 3. 【最後完美對齊】：
+  // 先把原本就有的舊欄位擺在前面，接著動態過濾出那些不在舊欄位清單裡、後來才新誕生的欄位（如 hobby），直接用解構緊接著推到最後面！
+  const allDynamicKeys: string[] = [
+    ...baseKeys, // 👈 舊欄位們（不管叫什麼名稱，如 age, birthday... 都不用硬編碼寫死）
+    ...rawDynamicKeys.filter(k => !baseKeys.includes(k)) // 👈 🎯 新增的欄位（如 hobby），百分之百直接塞到舊欄位緊接著的後面！
+  ];
 
   // 判斷是否有啟用過濾
   const isCustomerFiltering = Object.entries({
