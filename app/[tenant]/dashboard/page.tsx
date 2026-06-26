@@ -64,16 +64,23 @@ export default async function DashboardPage(props: {
     take: syncPageSize,
   });
 
-  // 🟢 【關鍵修正】：動態解析所有的屬性名稱（如 age, birthday, education, hobby 等）
-  // 排除掉不該獨立成欄位的 'customer_info' 與可能誤入的 'metadata' 字眼，全部統一轉成小寫
-  const allDynamicKeys: string[] = Array.from(
-    new Set(
-      allCustomers.flatMap((c: any) => {
-        const meta = (c.metadata as Record<string, any>) || {};
-        return Object.keys(meta).map(k => k.toLowerCase());
-      })
-    )
-  ).filter((key) => key !== 'customer_info' && key !== 'metadata');
+  // 🟢 1. 建立一個 Set，利用其「先進先出、保留第一次加入順序」的強大特性
+  const dynamicKeysSet = new Set<string>();
+
+  // 🟢 2. 依據客戶資料在系統中的建立先後順序（由舊到新），依序將他們身上的 Key 推進 Set
+  allCustomers.forEach((c: any) => {
+    const meta = (c.metadata as Record<string, any>) || {};
+    Object.keys(meta).forEach((k) => {
+      const lowerKey = k.toLowerCase();
+      // 排除掉您指定的特定保留字
+      if (lowerKey !== 'customer_info' && lowerKey !== 'metadata') {
+        dynamicKeysSet.add(lowerKey); // 如果已經存在的 Key，Set 會自動忽略；如果是全新的 hobby，因為較晚遇到，會被乖乖排在 Set 的最末端
+      }
+    });
+  });
+
+  // 🟢 3. 完全動態轉回陣列，名字完全不鎖死，未來加什麼新欄位都完美適用！
+  const allDynamicKeys: string[] = Array.from(dynamicKeysSet);
 
   // 判斷是否有啟用過濾
   const isCustomerFiltering = Object.entries({
