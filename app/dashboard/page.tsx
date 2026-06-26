@@ -52,7 +52,7 @@ export default async function DashboardPage(props: {
     take: syncPageSize,
   });
 
-  // 🟢 1. 【保留您最讚的原始代碼】：先拿到目前全體不重複的欄位聯集
+  // 🟢 1. 完全保留您最讚的原始代碼：先拿到目前全體不重複的欄位聯集
   const rawDynamicKeys: string[] = Array.from(
     new Set(
       allCustomers.flatMap((c: any) => {
@@ -62,33 +62,37 @@ export default async function DashboardPage(props: {
     )
   ).filter((key) => key !== 'customer_info' && key !== 'metadata');
 
-  // 🟢 2. 【核心實作：計算每個欄位在目前這頁資料中出現的次數】
-  // 我們統計當前分頁 50 筆資料裡，各個 Key 分別被多少個客戶擁有。
-  const keyCounts: Record<string, number> = {};
+  // 🟢 2. 【核心實作：動態過濾出最純淨的歷史舊欄位基礎】
+  // 我們先找出這頁客戶中，身上 metadata 欄位數量「最少」是多少（這代表最原始、完全沒被 Add Column 污染過的客戶）
+  const keyLengths = allCustomers.map((c: any) => {
+    const meta = (c.metadata as Record<string, any>) || {};
+    return Object.keys(meta).filter(k => k !== 'customer_info' && k !== 'metadata').length;
+  }).filter(len => len > 0);
+
+  const minLen = keyLengths.length > 0 ? Math.min(...keyLengths) : 0;
+
+  // 🟢 3. 收集所有「維持最原始少欄位狀態」的客戶身上的 Key，這就是我們 100% 純淨、動態的舊欄位清單！
+  const baseKeysSet = new Set<string>();
   allCustomers.forEach((c: any) => {
     const meta = (c.metadata as Record<string, any>) || {};
-    Object.keys(meta).forEach((k) => {
-      const lowerKey = k.toLowerCase();
-      if (lowerKey !== 'customer_info' && lowerKey !== 'metadata') {
-        keyCounts[lowerKey] = (keyCounts[lowerKey] || 0) + 1;
-      }
-    });
+    const keys = Object.keys(meta).map(k => k.toLowerCase()).filter(k => k !== 'customer_info' && k !== 'metadata');
+    // 如果這筆資料的欄位數等於最少欄位數，代表它是乾淨的歷史舊資料
+    if (keys.length === minLen) {
+      keys.forEach(k => baseKeysSet.add(k));
+    }
   });
 
-  // 🟢 3. 【新舊欄位動態分流】
-  // 舊欄位基準 (baseKeys)：在現有資料中，出現次數大於 1 的欄位（代表是原本大家就有的舊結構）
-  // 這樣能完全保留原本舊欄位 age, birthday, education 的原樣順序
-  const baseKeys = rawDynamicKeys.filter(key => (keyCounts[key] || 0) > 1);
-
-  // 新欄位 (newlyAddedKeys)：出現次數剛好只有 1 的欄位（代表剛點選 Add Column 新增，全系統只有他有）
-  const newlyAddedKeys = rawDynamicKeys.filter(key => (keyCounts[key] || 0) === 1);
+  const baseKeys = Array.from(baseKeysSet);
 
   // 🟢 4. 【最後完美對齊】：
-  // 先擺放原本大家都有的舊欄位結構（baseKeys），再把一開始沒加過的新欄位（newlyAddedKeys）百分之百黏在最後面！
+  // 先擺放最純淨、一開始就有的舊欄位結構（baseKeys）。
+  // 接著找出任何「一開始沒加入最原始 JsonB 裡」的全新動態欄位（不管是 like、hobby 還是未來的任何新稱呼），
+  // 百分之百直接、無條件被推到舊欄位緊接著的最後面！
   const allDynamicKeys: string[] = [
-    ...baseKeys,
-    ...newlyAddedKeys
+    ...baseKeys, // 👈 舊欄位（完全動態，名字 100% 不鎖死）
+    ...rawDynamicKeys.filter(k => !baseKeys.includes(k)) // 👈 🎯 新增的欄位，不論你在哪個 ID 上加、加幾個，一律強制靠最右邊站！
   ];
+  
   // 判斷是否有啟用過濾
   const isCustomerFiltering = Object.entries({
     id, name, email, role,
